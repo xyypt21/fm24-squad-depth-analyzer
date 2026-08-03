@@ -4,8 +4,7 @@ FM2024 4-2-3-1 阵容厚度分析工具。
 解析 RTF 阵容 → 计算 EA → 用匈牙利算法分配 3 套 EA 最佳 11 人。
 
 EA（预期能力）= CA + 成长潜力
-  年龄 < 18  按 18 岁算
-  18 ≤ 年龄 < 21  EA = CA + (21 - 年龄) × 20
+  年龄 < 21  EA = CA + (21 - 年龄) × 20
   年龄 ≥ 21   EA = CA
   EA 不超过 PA
 """
@@ -19,6 +18,38 @@ from datetime import datetime
 FM_DIR = Path(r"C:\Users\xyy\Documents\Sports Interactive\Football Manager 2024")
 RTF_PATH = FM_DIR / "team.rtf"
 OUTPUT   = Path(__file__).parent / "fm_analysis.html"
+
+CONFIG_PATH = Path(__file__).parent / "config.json"
+DEFAULT_CONFIG = {
+    "rtf_path": str(RTF_PATH),
+    "growth_until_age": 21,
+    "growth_per_year": 20,
+}
+
+
+# ── 配置文件 ────────────────────────────────────────────
+def load_config(path=None):
+    """读取配置文件，缺失或损坏时返回默认值。"""
+    path = Path(path) if path else CONFIG_PATH
+    if not path.exists():
+        return dict(DEFAULT_CONFIG)
+    import json
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return dict(DEFAULT_CONFIG)
+    return {
+        "rtf_path": data.get("rtf_path", DEFAULT_CONFIG["rtf_path"]),
+        "growth_until_age": int(data.get("growth_until_age", DEFAULT_CONFIG["growth_until_age"])),
+        "growth_per_year": int(data.get("growth_per_year", DEFAULT_CONFIG["growth_per_year"])),
+    }
+
+
+def save_config(config, path=None):
+    """将配置写回文件。"""
+    path = Path(path) if path else CONFIG_PATH
+    import json
+    path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
 SLOTS = ["GK", "DL", "DC", "DC", "DR", "DM", "DM",
          "AML", "AMC", "AMR", "ST"]
@@ -141,17 +172,18 @@ def read_roster_from_rtf(path=None):
 
 
 # ── EA 计算 ─────────────────────────────────────────────
-def calculate_ea(players):
+def calculate_ea(players, growth_until_age=21, growth_per_year=20):
     """
     为每个球员计算 EA（预期能力）。
     EA = CA + 成长潜力，上限 PA，不超过 PA。
+    growth_until_age: 成长停止的年龄（默认 21），可调。
+    growth_per_year:  每岁成长值（默认 20），可调。
     """
     for player in players:
-        clamped_age = max(player["age"], 18)
-        if clamped_age >= 21:
+        if player["age"] >= growth_until_age:
             player["ea"] = player["ca"]
         else:
-            growth = (21 - clamped_age) * 20
+            growth = (growth_until_age - player["age"]) * growth_per_year
             player["ea"] = min(player["ca"] + growth, player["pa"])
 
 
@@ -373,18 +405,21 @@ def generate_full_html(ea_first, ea_second, depth_chart, dc_unique_count):
 
 
 # ── 主流程 ──────────────────────────────────────────────
-def analyze(roster, output=None):
+def analyze(roster, output=None, growth_until_age=21, growth_per_year=20):
     """
     核心分析流程：计算 EA、分配两套 EA 最佳 11 人、生成深度图。
     roster: 球员 dict 列表，每个含 name/age/position/ca/pa。
     output: 输出的 HTML 路径，默认 OUTPUT。
+    growth_until_age: EA 成长停止年龄（默认 21）。
+    growth_per_year:  EA 每岁成长值（默认 20）。
     返回 HTML 字符串；roster 为空返回 None。
     """
     if not roster:
         print("未找到阵容数据")
         return None
 
-    calculate_ea(roster)
+    calculate_ea(roster, growth_until_age=growth_until_age,
+                 growth_per_year=growth_per_year)
 
     candidates = filter_senior_players(roster)
     ea_best = select_best_xi(candidates, "ea")
