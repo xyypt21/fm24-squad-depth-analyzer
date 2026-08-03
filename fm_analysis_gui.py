@@ -1,0 +1,114 @@
+"""
+FM2024 4-2-3-1 阵容厚度分析 - 图形界面版。
+
+用法：python fm_analysis_gui.py
+"""
+
+import os
+import threading
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from pathlib import Path
+
+import fm_analysis as fa
+
+DEFAULT_RTF = fa.RTF_PATH
+
+
+class FmGui:
+    def __init__(self, root):
+        self.root = root
+        root.title("FM2024 阵容厚度分析")
+        root.geometry("720x520")
+        root.minsize(640, 420)
+
+        pad = {"padx": 6, "pady": 4}
+        frm = ttk.Frame(root, padding=10)
+        frm.pack(fill="both", expand=True)
+
+        self.rtf_var = tk.StringVar(value=str(DEFAULT_RTF))
+
+        ttk.Label(frm, text="阵容文件 (RTF):").grid(row=0, column=0, sticky="w", **pad)
+        ttk.Entry(frm, textvariable=self.rtf_var).grid(row=0, column=1, sticky="ew", **pad)
+        ttk.Button(frm, text="浏览...", command=self.browse_rtf).grid(row=0, column=2, **pad)
+
+        btn_row = ttk.Frame(frm)
+        btn_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
+        self.run_btn = ttk.Button(btn_row, text="开始分析", command=self.start_analysis)
+        self.run_btn.pack(side="left")
+        ttk.Button(btn_row, text="退出", command=root.destroy).pack(side="right")
+
+        self.log = tk.Text(frm, height=14, state="disabled", wrap="word")
+        self.log.grid(row=2, column=0, columnspan=3, sticky="nsew", **pad)
+        scroll = ttk.Scrollbar(frm, command=self.log.yview)
+        scroll.grid(row=2, column=3, sticky="ns")
+        self.log.configure(yscrollcommand=scroll.set)
+
+        frm.columnconfigure(1, weight=1)
+        frm.rowconfigure(2, weight=1)
+
+        self.status = tk.StringVar(value="就绪")
+        ttk.Label(frm, textvariable=self.status).grid(row=3, column=0, columnspan=3, sticky="w", **pad)
+
+    def log_line(self, text):
+        self.log.configure(state="normal")
+        self.log.insert("end", text + "\n")
+        self.log.see("end")
+        self.log.configure(state="disabled")
+
+    def browse_rtf(self):
+        path = filedialog.askopenfilename(
+            title="选择阵容文件",
+            filetypes=[("RTF 文件", "*.rtf"), ("所有文件", "*.*")],
+            initialdir=str(DEFAULT_RTF.parent) if DEFAULT_RTF.exists() else os.path.expanduser("~"),
+        )
+        if path:
+            self.rtf_var.set(path)
+
+    def open_result(self):
+        path = fa.OUTPUT
+        if path.exists():
+            os.startfile(str(path.resolve()))
+        else:
+            messagebox.showwarning("提示", "结果文件不存在，请先运行分析。")
+
+    def start_analysis(self):
+        if not Path(self.rtf_var.get()).exists():
+            messagebox.showerror("错误", "阵容文件不存在，请检查路径。")
+            return
+        self.run_btn.configure(state="disabled")
+        self.status.set("分析中...")
+        self.log_line("-" * 40)
+        self.log_line(f"读取: {self.rtf_var.get()}")
+        thread = threading.Thread(target=self._analyze, daemon=True)
+        thread.start()
+
+    def _analyze(self):
+        try:
+            rtf_path = Path(self.rtf_var.get())
+            roster = fa.read_roster_from_rtf(rtf_path)
+            html = fa.analyze(roster, output=fa.OUTPUT)
+            if html:
+                message = f"完成：共 {len(roster)} 名球员，结果已写入 {fa.OUTPUT}"
+            else:
+                message = "未找到阵容数据，请确认 RTF 文件格式正确。"
+        except Exception as exc:
+            message = f"分析出错：{exc}"
+        self.root.after(0, self._on_done, message)
+
+    def _on_done(self, message):
+        self.log_line(message)
+        self.status.set(message)
+        self.run_btn.configure(state="normal")
+        if message.startswith("完成"):
+            self.open_result()
+
+
+def main():
+    root = tk.Tk()
+    FmGui(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
