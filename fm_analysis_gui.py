@@ -1,7 +1,7 @@
 """
-FM2024 4-2-3-1 阵容厚度分析 - 图形界面版。
+FM2024 4-2-3-1 squad depth analysis - GUI version.
 
-用法：python fm_analysis_gui.py
+Usage: python fm_analysis_gui.py
 """
 
 import os
@@ -12,7 +12,6 @@ from pathlib import Path
 
 import fm_analysis as fa
 
-DEFAULT_RTF = fa.RTF_PATH
 
 class FmGui:
     def __init__(self, root):
@@ -65,7 +64,9 @@ class FmGui:
         frm.rowconfigure(4, weight=1)
 
         self.status = tk.StringVar(value="就绪")
-        ttk.Label(frm, textvariable=self.status).grid(row=5, column=0, columnspan=3, sticky="w", **pad)
+        ttk.Label(frm, textvariable=self.status).grid(
+            row=5, column=0, columnspan=3, sticky="w", **pad
+        )
 
     def log_line(self, text):
         self.log.configure(state="normal")
@@ -119,7 +120,11 @@ class FmGui:
         self.log_line("-" * 40)
         self.log_line(f"读取: {self.rtf_var.get()}")
         self.log_line(f"EA 参数: 成长至 {growth_until_age} 岁，每年 +{growth_per_year}")
-        thread = threading.Thread(target=self._analyze, args=(growth_until_age, growth_per_year), daemon=True)
+        thread = threading.Thread(
+            target=self._analyze,
+            args=(growth_until_age, growth_per_year),
+            daemon=True,
+        )
         thread.start()
 
     def _analyze(self, growth_until_age, growth_per_year):
