@@ -1,39 +1,51 @@
-# FM24 闃靛娣卞害鍒嗘瀽鍣?
-鍒嗘瀽 Football Manager 2024 鐞冮槦闃靛娣卞害锛屼负 4-2-3-1 闃靛瀷鑷姩閫夊嚭 EA 鏈€浣充笌娆′匠 11 浜猴紝骞剁敓鎴愭繁搴﹀浘涓庤ˉ寮哄缓璁€?
-## 鍔熻兘
+# FM24 阵容深度分析器
 
-- 瑙ｆ瀽 FM 瀵煎嚭鐨?RTF 闃靛琛ㄦ牸锛堟敮鎸佷腑鏂囧瓧娈碉細濮撳悕/骞撮緞/浣嶇疆/鑳藉姏/娼滃姏锛?- 璁＄畻姣忎釜鐞冨憳鐨?EA锛堥鏈熻兘鍔涳級锛?  - `骞撮緞 < 鎴愰暱鑷冲勾榫刞 鈫?`EA = CA + (鎴愰暱鑷冲勾榫?- 骞撮緞) 脳 姣忓勾鎴愰暱`锛堜笉瓒呰繃 PA锛?  - `骞撮緞 鈮?鎴愰暱鑷冲勾榫刞 鈫?`EA = CA`
-  - 鎴愰暱鑷冲勾榫勶紙榛樿 21锛変笌姣忓勾鎴愰暱鍊硷紙榛樿 20锛夊潎鍙皟鏁?- 鐢ㄥ寛鐗欏埄绠楁硶鍒嗛厤 EA 鏈€浣?11 浜恒€丒A 娆′匠 11 浜?- 鐢熸垚娣卞害鍥撅紝姣忎釜浣嶇疆缁欏嚭琛ュ己鍒嗭紙鍒嗘暟瓒婇珮瓒婇渶瑕佽ˉ寮猴級
-- 杈撳嚭鍙鍖?HTML 鎶ュ憡锛堢悆鍦洪樀鍨嬪浘 + 娣卞害鍥撅級
-- 鍥惧舰鐣岄潰锛坱kinter锛変笌鍛戒护琛屼袱绉嶄娇鐢ㄦ柟寮?- `rtf_path` 鏀寔 `~` 琛ㄧず鐢ㄦ埛涓荤洰褰曪紝渚夸簬鎹㈡満杩佺Щ
+分析 Football Manager 2024 球队阵容深度，为 4-2-3-1 阵型自动选出 EA 最佳与次佳 11 人，并生成深度图与补强建议。
 
-## 鐜瑕佹眰
+## 功能
+
+- 解析 FM 导出的 RTF 阵容表格（支持中文字段：姓名/年龄/位置/能力/潜力）
+- 计算每个球员的 EA（预期能力）：
+  - `年龄 < 成长至年龄` → `EA = CA + (成长至年龄 - 年龄) × 每年成长`（不超过 PA）
+  - `年龄 ≥ 成长至年龄` → `EA = CA`
+  - 成长至年龄（默认 21）与每年成长值（默认 20）均可调整
+- 用匈牙利算法分配 EA 最佳 11 人、EA 次佳 11 人
+- 生成深度图，每个位置给出补强分（分数越高越需要补强）
+- 输出可视化 HTML 报告（球场阵型图 + 深度图）
+- 图形界面（tkinter）与命令行两种使用方式
+- `rtf_path` 支持 `~` 表示用户主目录，便于换机迁移
+
+## 环境要求
 
 - Python 3.8+
-- 渚濊禆锛歚numpy`銆乣scipy`
+- 依赖：`numpy`、`scipy`
 
 ```bash
 pip install numpy scipy
 ```
 
-## 浣跨敤鏂规硶
+## 使用方法
 
-### 鍥惧舰鐣岄潰
+### 图形界面
 
 ```bash
 python fm_analysis_gui.py
 ```
 
-鍦ㄧ晫闈腑锛?1. 閫夋嫨鎴栬緭鍏?RTF 闃靛鏂囦欢璺緞锛堥粯璁よ鍙?`config.json` 涓繚瀛樼殑璺緞锛?2. 璋冩暣 EA 鍏紡鍙傛暟锛堟垚闀胯嚦骞撮緞銆佹瘡骞存垚闀匡級
-3. 鐐瑰嚮"寮€濮嬪垎鏋?锛屽畬鎴愬悗鑷姩鎵撳紑 HTML 鎶ュ憡
+在界面中：
+1. 选择或输入 RTF 阵容文件路径（默认读取 `config.json` 中保存的路径）
+2. 调整 EA 公式参数（成长至年龄、每年成长）
+3. 点击"开始分析"，完成后自动打开 HTML 报告
 
-### 鍛戒护琛?
+### 命令行
+
 ```bash
 python fm_analysis.py
 ```
 
-榛樿璇诲彇 `config.json` 涓繚瀛樼殑璺緞锛堥粯璁?`~\Documents\Sports Interactive\Football Manager 2024\team.rtf`锛夛紝缁撴灉鍐欏叆 `fm_analysis.html`銆?
-### 浣滀负妯″潡璋冪敤
+默认读取 `config.json` 中保存的路径（默认 `~\Documents\Sports Interactive\Football Manager 2024\team.rtf`），结果写入 `fm_analysis.html`。
+
+### 作为模块调用
 
 ```python
 import fm_analysis as fa
@@ -42,9 +54,10 @@ roster = fa.read_roster_from_rtf(r"path\to\team.rtf")
 html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
 ```
 
-## 閰嶇疆鏂囦欢
+## 配置文件
 
-`config.json` 淇濆瓨 GUI 鐨勯粯璁よ缃紝杩愯鏃跺彲鑷姩璇诲啓锛?
+`config.json` 保存 GUI 的默认设置，运行时可自动读写：
+
 ```json
 {
   "rtf_path": "~\\Documents\\Sports Interactive\\Football Manager 2024\\team.rtf",
@@ -53,24 +66,36 @@ html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
 }
 ```
 
-- `rtf_path`锛氶樀瀹规枃浠惰矾寰勶紙`~` 灞曞紑涓虹敤鎴蜂富鐩綍锛?- `growth_until_age`锛欵A 鎴愰暱鍋滄骞撮緞
-- `growth_per_year`锛欵A 姣忓瞾鎴愰暱鍊?
-鏂囦欢缂哄け鎴栨崯鍧忔椂鑷姩鍥為€€鍒伴粯璁ゅ€笺€?
-## RTF 鏂囦欢瑕佹眰
+- `rtf_path`：阵容文件路径（`~` 展开为用户主目录）
+- `growth_until_age`：EA 成长停止年龄
+- `growth_per_year`：EA 每岁成长值
 
-浠?FM 鍐呭鍑洪樀瀹硅鍥句负 RTF 鏍煎紡锛岃〃鏍奸渶鍖呭惈浠ヤ笅涓枃瀛楁锛?
-| 濮撳悕 | 骞撮緞 | 浣嶇疆 | 鑳藉姏 | 娼滃姏 |
+文件缺失或损坏时自动回退到默认值。
+
+## RTF 文件要求
+
+从 FM 内导出阵容视图为 RTF 格式，表格需包含以下中文字段：
+
+| 姓名 | 年龄 | 位置 | 能力 | 潜力 |
 | ---- | ---- | ---- | ---- | ---- |
 
-`鑳藉姏` 鍒楀鍑轰袱浠斤紙褰撳墠/娼滃姏锛夛紝瑙ｆ瀽鍣ㄥ彇绗簩浠戒綔涓哄綋鍓嶈兘鍔?CA銆?
-## 椤圭洰缁撴瀯
+`能力` 列导出两份（当前/潜力），解析器取第二份作为当前能力 CA。
+
+## 项目结构
 
 ```
-fm_analysis.py       鏍稿績閫昏緫锛歊TF 瑙ｆ瀽銆丒A 璁＄畻銆侀樀瀹瑰垎閰?fm_report.py         HTML 鎶ュ憡娓叉煋锛堜粠 templates/ 璇诲彇妯℃澘锛?fm_analysis_gui.py   tkinter 鍥惧舰鐣岄潰
-fm_analysis.html     鐢熸垚鐨勬姤鍛婅緭鍑猴紙琚?gitignore 蹇界暐锛?config.json          閰嶇疆鏂囦欢
-templates/style.css      鎶ュ憡鏍峰紡琛?templates/report.html    鎶ュ憡 HTML 楠ㄦ灦锛堝崰浣嶇鏇挎崲锛?```
+fm_analysis.py       核心逻辑：RTF 解析、EA 计算、阵容分配
+fm_report.py         HTML 报告渲染（从 templates/ 读取模板）
+fm_analysis_gui.py   tkinter 图形界面
+fm_analysis.html     生成的报告输出（被 gitignore 忽略）
+config.json          配置文件
+templates/style.css      报告样式表
+templates/report.html    报告 HTML 骨架（占位符替换）
+```
 
-## EA 琛ュ己鍒嗚鏄?
-- 姣忎釜浣嶇疆鏈€澶?4 鍒?- 棣栧彂璇ヤ綅缃悆鍛?EA 浣庝簬鍙傝€冨€硷紙棣?11 浜哄钩鍧?EA 鐨?90%锛?2
-- 娆′匠 11 浜鸿浣嶇疆鐞冨憳寮?+1
-- 娣卞害鍥捐浣嶇疆寮辩悆鍛樻瘮渚嬶紙1 浣嶅皬鏁帮級+鐩稿簲姣斾緥
+## EA 补强分说明
+
+- 每个位置最多 4 分
+- 首发该位置球员 EA 低于参考值（首 11 人平均 EA 的 90%）+2
+- 次佳 11 人该位置球员弱 +1
+- 深度图该位置弱球员比例（1 位小数）+相应比例
