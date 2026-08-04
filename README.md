@@ -1,51 +1,51 @@
-# FM24 阵容深度分析器
+# FM24 Squad Depth Analyzer
 
-分析 Football Manager 2024 球队阵容深度，为 4-2-3-1 阵型自动选出 EA 最佳与次佳 11 人，并生成深度图与补强建议。
+Analyzes the squad depth of your Football Manager 2024 team, picks the best and second-best starting XIs for a 4-2-3-1 formation, and generates a depth chart with reinforcement suggestions.
 
-## 功能
+## Features
 
-- 解析 FM 导出的 RTF 阵容表格（支持中文字段：姓名/年龄/位置/能力/潜力）
-- 计算每个球员的 EA（预期能力）：
-  - `年龄 < 成长至年龄` → `EA = CA + (成长至年龄 - 年龄) × 每年成长`（不超过 PA）
-  - `年龄 ≥ 成长至年龄` → `EA = CA`
-  - 成长至年龄（默认 21）与每年成长值（默认 20）均可调整
-- 用匈牙利算法分配 EA 最佳 11 人、EA 次佳 11 人
-- 生成深度图，每个位置给出补强分（分数越高越需要补强）
-- 输出可视化 HTML 报告（球场阵型图 + 深度图）
-- 图形界面（tkinter）与命令行两种使用方式
-- `rtf_path` 支持 `~` 表示用户主目录，便于换机迁移
+- Parses RTF roster tables exported from FM (supports Chinese headers: 姓名/年龄/位置/能力/潜力)
+- Computes Expected Ability (EA) for every player:
+  - `age < growth_until_age` → `EA = CA + (growth_until_age - age) × growth_per_year` (capped at PA)
+  - `age >= growth_until_age` → `EA = CA`
+  - `growth_until_age` (default 21) and `growth_per_year` (default 20) are configurable
+- Picks the best and second-best starting XIs using the Hungarian algorithm
+- Generates a depth chart with a reinforcement score per position (higher = needs strengthening)
+- Outputs a visual HTML report (pitch diagrams + depth chart)
+- Both a GUI (tkinter) and a command-line interface
+- `rtf_path` supports `~` as the user home directory for easy portability
 
-## 环境要求
+## Requirements
 
 - Python 3.8+
-- 依赖：`numpy`、`scipy`
+- Dependencies: `numpy`, `scipy`
 
 ```bash
 pip install numpy scipy
 ```
 
-## 使用方法
+## Usage
 
-### 图形界面
+### GUI
 
 ```bash
 python fm_analysis_gui.py
 ```
 
-在界面中：
-1. 选择或输入 RTF 阵容文件路径（默认读取 `config.json` 中保存的路径）
-2. 调整 EA 公式参数（成长至年龄、每年成长）
-3. 点击"开始分析"，完成后自动打开 HTML 报告
+In the window:
+1. Pick or enter the RTF roster file path (defaults to the path saved in `config.json`)
+2. Adjust the EA formula parameters (growth until age, growth per year)
+3. Click "开始分析" (Start analysis); the HTML report opens automatically when done
 
-### 命令行
+### Command line
 
 ```bash
 python fm_analysis.py
 ```
 
-默认读取 `config.json` 中保存的路径（默认 `~\Documents\Sports Interactive\Football Manager 2024\team.rtf`），结果写入 `fm_analysis.html`。
+Reads the path saved in `config.json` (default `~\Documents\Sports Interactive\Football Manager 2024\team.rtf`) and writes the result to `fm_analysis.html`.
 
-### 作为模块调用
+### As a module
 
 ```python
 import fm_analysis as fa
@@ -54,9 +54,9 @@ roster = fa.read_roster_from_rtf(r"path\to\team.rtf")
 html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
 ```
 
-## 配置文件
+## Configuration
 
-`config.json` 保存 GUI 的默认设置，运行时可自动读写：
+`config.json` stores the GUI defaults and is read/written automatically:
 
 ```json
 {
@@ -66,36 +66,36 @@ html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
 }
 ```
 
-- `rtf_path`：阵容文件路径（`~` 展开为用户主目录）
-- `growth_until_age`：EA 成长停止年龄
-- `growth_per_year`：EA 每岁成长值
+- `rtf_path`: roster file path (`~` expands to the user home directory)
+- `growth_until_age`: age at which EA growth stops
+- `growth_per_year`: EA growth per year of age
 
-文件缺失或损坏时自动回退到默认值。
+If the file is missing or corrupt, defaults are used automatically.
 
-## RTF 文件要求
+## RTF File Requirements
 
-从 FM 内导出阵容视图为 RTF 格式，表格需包含以下中文字段：
+Export the squad view from FM as RTF. The table must include these Chinese columns:
 
 | 姓名 | 年龄 | 位置 | 能力 | 潜力 |
 | ---- | ---- | ---- | ---- | ---- |
 
-`能力` 列导出两份（当前/潜力），解析器取第二份作为当前能力 CA。
+The `能力` (Ability) column is exported twice (current/potential); the parser takes the second one as the current Ability (CA).
 
-## 项目结构
+## Project Structure
 
 ```
-fm_analysis.py       核心逻辑：RTF 解析、EA 计算、阵容分配
-fm_report.py         HTML 报告渲染（从 templates/ 读取模板）
-fm_analysis_gui.py   tkinter 图形界面
-fm_analysis.html     生成的报告输出（被 gitignore 忽略）
-config.json          配置文件
-templates/style.css      报告样式表
-templates/report.html    报告 HTML 骨架（占位符替换）
+fm_analysis.py        Core logic: RTF parsing, EA calculation, lineup selection
+fm_report.py          HTML report rendering (reads templates from templates/)
+fm_analysis_gui.py    tkinter GUI
+fm_analysis.html      Generated report output (ignored by git)
+config.json           Configuration file
+templates/style.css   Report stylesheet
+templates/report.html Report HTML skeleton (placeholder-based)
 ```
 
-## EA 补强分说明
+## Reinforcement Score
 
-- 每个位置最多 4 分
-- 首发该位置球员 EA 低于参考值（首 11 人平均 EA 的 90%）+2
-- 次佳 11 人该位置球员弱 +1
-- 深度图该位置弱球员比例（1 位小数）+相应比例
+- Max 4 points per position
+- A weak starter in that position: +2
+- A weak backup (second XI) in that position: +1
+- Ratio of weak players in the depth chart for that position (1 decimal place): +ratio
