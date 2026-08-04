@@ -7,8 +7,8 @@ FM2024 4-2-3-1 阵容深度分析 - 图形界面版。
 import os
 import threading
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 
 import fm_analysis as fa
 
@@ -112,9 +112,13 @@ class FmGui:
         except ValueError:
             messagebox.showerror("错误", "EA 参数必须是正整数（每年成长可为 0）。")
             return
-        fa.save_config({"rtf_path": self.rtf_var.get(),
-                        "growth_until_age": growth_until_age,
-                        "growth_per_year": growth_per_year})
+        fa.save_config(
+            {
+                "rtf_path": self.rtf_var.get(),
+                "growth_until_age": growth_until_age,
+                "growth_per_year": growth_per_year,
+            }
+        )
         self.run_btn.configure(state="disabled")
         self.status.set("分析中...")
         self.log_line("-" * 40)
@@ -131,9 +135,12 @@ class FmGui:
         try:
             rtf_path = Path(self.rtf_var.get())
             roster = fa.read_roster_from_rtf(rtf_path)
-            html = fa.analyze(roster, output=fa.OUTPUT,
-                              growth_until_age=growth_until_age,
-                              growth_per_year=growth_per_year)
+            html = fa.analyze(
+                roster,
+                output=fa.OUTPUT,
+                growth_until_age=growth_until_age,
+                growth_per_year=growth_per_year,
+            )
             if html:
                 message = f"完成：共 {len(roster)} 名球员，结果已写入 {fa.OUTPUT}"
             else:
