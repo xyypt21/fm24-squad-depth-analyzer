@@ -1,7 +1,7 @@
 """
-FM2024 4-2-3-1 squad depth analysis - GUI version.
+FM2024 4-2-3-1 阵容深度分析 - 图形界面版。
 
-Usage: python fm_analysis_gui.py
+用法：python fm_analysis_gui.py
 """
 
 import os
