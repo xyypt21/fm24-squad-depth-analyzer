@@ -1,7 +1,7 @@
 """
-FM2024 4-2-3-1 阵容深度分析 - HTML 报告渲染。
+FM2024 4-2-3-1 squad depth analysis - HTML report rendering.
 
-将分析结果渲染为可视化 HTML 报告（球场阵型图 + 深度图）。
+Renders the analysis results as a visual HTML report (pitch diagrams + depth chart).
 """
 
 from datetime import datetime
@@ -11,7 +11,7 @@ from fm_analysis import DEPTH_SLOT_MAP, DEPTH_SLOTS
 
 
 def compute_average(xi, sort_key):
-    """计算一套首发阵容的平均分。"""
+    """Compute the average score of a starting XI."""
     return int(sum(p[sort_key] for _, p in xi) / len(xi)) if xi else 0
 
 
@@ -20,7 +20,7 @@ def is_weak(player_ea, ref):
 
 
 def render_player_slot(slot_name, player, sort_key, reference_value):
-    """渲染单个球员槽位的 HTML。"""
+    """Render the HTML for a single player slot."""
     weak = " slot-weak" if is_weak(player[sort_key], reference_value) else ""
     return (
         f"<div class='slot{weak}'>"
@@ -33,8 +33,8 @@ def render_player_slot(slot_name, player, sort_key, reference_value):
 
 def render_pitch(xi, sort_key, reference_value):
     """
-    渲染 11 人球场阵型图。
-    行排列：STC / AML,AMC,AMR / DMC,DMC / DL,DC,DC,DR / GK
+    Render the 11-man pitch diagram.
+    Row layout: STC / AML,AMC,AMR / DMC,DMC / DL,DC,DC,DR / GK
     """
 
     def slot_html(index):
@@ -52,7 +52,7 @@ def render_pitch(xi, sort_key, reference_value):
 
 
 def render_pitch_card(xi, sort_key, reference=None):
-    """渲染一张完整的球场卡片。"""
+    """Render a full pitch card."""
     average = compute_average(xi, sort_key)
     if not xi:
         return (
@@ -65,13 +65,16 @@ def render_pitch_card(xi, sort_key, reference=None):
 
 def compute_scores(ea_first, ea_second, depth_data, ref):
     """
-    补强分：分数越高越需要补强，每个位置最多 4 分。
-    首发该位置弱 +2，次佳该位置弱 +1，深度图中弱球员比例（保留 1 位小数）。
+    Reinforcement score: the higher, the more reinforcement is needed,
+    up to 4 points per position.
+    Weak starter in this position +2, weak second XI player +1, plus the
+    ratio of weak players in the depth chart (rounded to 1 decimal).
     """
     scores = {}
     for slot in DEPTH_SLOTS:
-        # ea_first/ea_second 是按 SLOTS 顺序的列表（下标即槽位位置），
-        # indices 是该位置在列表中的下标，用来检查首发/次佳该位置是否有弱球员
+        # ea_first/ea_second are lists ordered as SLOTS (index = slot position);
+        # indices maps this position to list indices, used to check whether the
+        # starter/second XI has a weak player here.
         indices = DEPTH_SLOT_MAP[slot]
         first_red = (
             2
@@ -94,7 +97,7 @@ def compute_scores(ea_first, ea_second, depth_data, ref):
 
 
 def render_depth_chart(depth_data, reference_value, scores=None):
-    """渲染深度图（2 列纵向分区布局，按补强分降序排列）。"""
+    """Render the depth chart (2-column layout, sorted by reinforcement score desc)."""
     slots_sorted = sorted(DEPTH_SLOTS, key=lambda s: -(scores.get(s, 0) if scores else 0))
 
     mid = (len(slots_sorted) + 1) // 2

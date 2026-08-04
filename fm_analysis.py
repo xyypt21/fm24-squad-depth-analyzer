@@ -1,12 +1,13 @@
 """
-FM2024 4-2-3-1 阵容深度分析工具。
+FM2024 4-2-3-1 squad depth analysis tool.
 
-解析 RTF 阵容 → 计算 EA → 用匈牙利算法选出 EA 最佳与次佳 11 人。
+Parses the RTF roster → computes EA → uses the Hungarian algorithm to pick
+the EA best and second-best starting XI.
 
-EA（预期能力）= CA + 成长潜力
-  年龄 < 21  EA = CA + (21 - 年龄) × 20
-  年龄 ≥ 21   EA = CA
-  EA 不超过 PA
+EA (Expected Ability) = CA + growth potential
+  age < 21   EA = CA + (21 - age) × 20
+  age >= 21  EA = CA
+  EA capped at PA
 """
 
 import json
@@ -18,19 +19,19 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-# ── 路径与配置 ──────────────────────────────────────────
+# ── Paths & config ──────────────────────────────────────────
 OUTPUT = Path(__file__).parent / "fm_analysis.html"
 CONFIG_PATH = Path(__file__).parent / "config.json"
 DEFAULT_CONFIG = {
-    "rtf_path": r"C:\Users\xyy\Documents\Sports Interactive\Football Manager 2024\team.rtf",
+    "rtf_path": r"~\Documents\Sports Interactive\Football Manager 2024\team.rtf",
     "growth_until_age": 21,
     "growth_per_year": 20,
 }
 
 
-# ── 配置文件 ────────────────────────────────────────────
+# ── Config file ────────────────────────────────────────────
 def load_config(path=None):
-    """读取配置文件，缺失或损坏时回退到默认值。"""
+    """Read the config file, falling back to defaults if missing or corrupt."""
     path = Path(path) if path else CONFIG_PATH
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -45,30 +46,33 @@ def load_config(path=None):
 
 
 def save_config(config, path=None):
-    """将配置写回文件。"""
+    """Write the config back to the file."""
     path = Path(path) if path else CONFIG_PATH
     path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-# ── 阵型槽位 ────────────────────────────────────────────
+# ── Formation slots ────────────────────────────────────────
 SLOTS = ["GK", "DL", "DC", "DC", "DR", "DMC", "DMC", "AML", "AMC", "AMR", "STC"]
 
-# 深度图槽位：由 SLOTS 自动推导（按首现顺序去重，并记录每个槽位的下标）
-# 说明：SLOTS 是 11 人阵型（含重复的 DC/DMC），而补强分/深度图按"位置"统计，
-#       需用 DEPTH_SLOT_MAP 把位置翻译成 ea_first/ea_second 列表（按 SLOTS 顺序）中的下标。
-#       例如 DEPTH_SLOT_MAP["DC"] == [2, 3] 表示两个中卫位于 11 人列表的下标 2 和 3。
+# Depth-chart slots: auto-derived from SLOTS (deduped by first occurrence,
+# recording the index of each slot in the formation).
+# Note: SLOTS is the 11-man formation (with repeated DC/DMC), whereas the
+# reinforcement scores and depth chart are grouped by *position*, so we use
+# DEPTH_SLOT_MAP to translate a position into indices in the ea_first/ea_second
+# lists (ordered as in SLOTS). E.g. DEPTH_SLOT_MAP["DC"] == [2, 3] means the two
+# centre-backs sit at indices 2 and 3 of the 11-man lists.
 DEPTH_SLOT_MAP = {}
 for i, slot in enumerate(SLOTS):
     DEPTH_SLOT_MAP.setdefault(slot, []).append(i)
 DEPTH_SLOTS = list(DEPTH_SLOT_MAP)
 
 
-# ── 位置解析 ────────────────────────────────────────────
-# 合法的 FM 位置角色与侧面字母
+# ── Position parsing ───────────────────────────────────────
+# Valid FM position roles and side letters
 VALID_ROLES = {"GK", "D", "WB", "DM", "M", "AM", "ST"}
 VALID_SIDES = {"C", "L", "R"}
 
-# 全部合法的位置 token（FM 完整位置列表）
+# All valid position tokens (full FM position set)
 VALID_POSITION_TOKENS = {
     "GK",
     "WBL",
@@ -81,56 +85,57 @@ VALID_POSITION_TOKENS = {
 
 def parse_position_tokens(position_text):
     """
-    将 FM 位置字符串拆成"角色+侧面"组合 token，只保留合法位置。
-    无括号的角色按中路（+C）处理，例如 "DM" → ["DMC"]。
+    Split an FM position string into "role+side" tokens, keeping only valid ones.
+    Roles without parentheses are treated as centre (+C), e.g. "DM" -> ["DMC"].
 
-    例子：
-      "M (L), AM (RLC)"     → ["ML", "AMR", "AML", "AMC"]
-      "D/WB (R)"            → ["DR", "WBR"]
-      "ST (C)"              → ["STC"]
-      "DM"                  → ["DMC"]
-      "GK"                  → ["GK"]
+    Examples:
+      "M (L), AM (RLC)"     -> ["ML", "AMR", "AML", "AMC"]
+      "D/WB (R)"            -> ["DR", "WBR"]
+      "ST (C)"              -> ["STC"]
+      "DM"                  -> ["DMC"]
+      "GK"                  -> ["GK"]
     """
     tokens = []
-    # 用正则一次性抓取每段"角色(侧面)"，自动跳过逗号与空格。
-    # 例如 "M (L), AM (RLC)" 依次抓到 (M, L) 和 (AM, RLC)
+    # Grab each "role(sides)" chunk in one regex pass, skipping commas/spaces.
+    # E.g. "M (L), AM (RLC)" yields (M, L) then (AM, RLC)
     for roles_text, sides_text in re.findall(
         r"([A-Z/]+)\s*(?:\(([A-Z]+)\))?", position_text.upper()
     ):
-        # 处理 D/WB 这类复合角色，逐个取 D、WB
+        # Handle compound roles like D/WB, taking D and WB one by one
         for role in roles_text.split("/"):
-            # 角色不在合法位置里（如 XX）则跳过
+            # Skip roles that are not valid (e.g. XX)
             if role not in VALID_ROLES:
                 continue
             if sides_text:
-                # 有括号侧面：先校验侧面字母合法，再逐个拼成 token
+                # Sides in parentheses: validate them, then build one token each
                 if all(s in VALID_SIDES for s in sides_text):
                     tokens.extend(role + s for s in sides_text)
             else:
-                # 无括号：GK 保持 GK，其它角色按中路(+C)处理，如 DM -> DMC
+                # No parentheses: GK stays GK, other roles treated as centre,
+                # e.g. DM -> DMC
                 tokens.append("GK" if role == "GK" else role + "C")
-    # 兜底过滤：不在合法位置表里的 token 一律丢弃
+    # Safety filter: drop any token not in the valid position table
     return [t for t in tokens if t in VALID_POSITION_TOKENS]
 
 
 def player_can_play(position_text, slot_name):
-    """判断球员能否胜任某个阵型槽位。"""
+    """Check whether a player can fill a formation slot."""
     return slot_name in parse_position_tokens(position_text)
 
 
-# ── RTF 文件解析 ────────────────────────────────────────
+# ── RTF file parsing ───────────────────────────────────────
 def _clean(text):
-    """去掉零宽空格并去除首尾空白（FM 导出表格常带 \u200b）。"""
+    """Strip zero-width spaces and surrounding whitespace (FM exports carry \\u200b)."""
     return "".join(c for c in text if c != "\u200b").strip()
 
 
 def _num(text):
-    """提取单元格中的数字部分。"""
+    """Extract the digits out of a cell."""
     return int("".join(c for c in text if c.isdigit()))
 
 
 def _parse_columns(headers):
-    """根据表头识别各列下标（能力列导出两次，取第二个作为 CA）。"""
+    """Locate each column from the header row (ability is exported twice; take the 2nd as CA)."""
     col_index = {}
     ca_count = 0
     for i, header in enumerate(headers):
@@ -151,11 +156,12 @@ def _parse_columns(headers):
 
 def read_roster_from_rtf(path=None):
     """
-    读取 FM 导出的 RTF 表格，返回球员列表。
-    每个球员包含：name, age, position, ca, pa。
-    path: RTF 文件路径，默认读取配置文件中的路径。
+    Read the RTF table exported by FM and return the list of players.
+    Each player has: name, age, position, ca, pa.
+    path: RTF file path; defaults to the path in the config file.
     """
     path = Path(path) if path else Path(load_config()["rtf_path"])
+    path = path.expanduser()
     if not path.exists():
         return []
 
@@ -164,11 +170,11 @@ def read_roster_from_rtf(path=None):
     if not lines:
         return []
 
-    # 解析表头，动态定位各列
+    # Parse the header row to locate each column
     headers = [_clean(cell) for cell in lines[0].split("|")]
     col_index = _parse_columns(headers)
 
-    # 逐行解析球员数据
+    # Parse player data line by line
     players = []
     for line in lines[1:]:
         cells = [_clean(cell) for cell in line.split("|")]
@@ -189,13 +195,13 @@ def read_roster_from_rtf(path=None):
     return players
 
 
-# ── EA 计算 ─────────────────────────────────────────────
+# ── EA calculation ─────────────────────────────────────────
 def calculate_ea(players, growth_until_age=21, growth_per_year=20):
     """
-    为每个球员计算 EA（预期能力）。
-    EA = CA + 成长潜力，不超过 PA。
-    growth_until_age: 成长停止年龄（默认 21），可配置。
-    growth_per_year:  每岁成长值（默认 20），可配置。
+    Compute EA (Expected Ability) for every player.
+    EA = CA + growth potential, capped at PA.
+    growth_until_age: age at which growth stops (default 21), configurable.
+    growth_per_year:  growth per year of age (default 20), configurable.
     """
     for player in players:
         if player["age"] >= growth_until_age:
@@ -205,18 +211,19 @@ def calculate_ea(players, growth_until_age=21, growth_per_year=20):
             player["ea"] = min(player["ca"] + growth, player["pa"])
 
 
-# ── 阵容分配（匈牙利算法） ──────────────────────────────
+# ── Squad selection (Hungarian algorithm) ─────────────────
 def select_best_xi(candidates, sort_key):
     """
-    用匈牙利算法从候选中选出最优 11 人分配方案。
+    Use the Hungarian algorithm to pick the optimal 11-man assignment.
 
-    成本设计（全部为正数，保证算法稳定）：
-      - 合法分配：max_key - player_key（范围 0 到 max_key-1）
-      - 非法分配：远大于所有合法成本之和，确保算法优先选合法方案
+    Cost design (all positive for stable solving):
+      - Valid assignment: max_key - player_key (range 0 to max_key-1)
+      - Invalid assignment: far larger than any valid cost sum, so the
+        algorithm prefers valid lineups.
     """
     slot_count = len(SLOTS)
     max_key = max(p[sort_key] for p in candidates) if candidates else 200
-    huge_penalty = max_key * slot_count * 2 + 1  # 远超合法成本之和
+    huge_penalty = max_key * slot_count * 2 + 1  # far beyond any valid cost sum
 
     cost = np.full((slot_count, len(candidates)), huge_penalty, dtype=np.int32)
     for slot_i, slot_name in enumerate(SLOTS):
@@ -229,12 +236,12 @@ def select_best_xi(candidates, sort_key):
 
 
 def filter_senior_players(players):
-    """筛选年龄 >= 17 的球员。"""
+    """Keep only players aged >= 17."""
     return [p for p in players if p["age"] >= 17]
 
 
 def build_depth_chart(players):
-    """为每个槽位生成深度图数据（全量球员，允许重复出场）。"""
+    """Build depth-chart data per slot (full squad, players may appear twice)."""
     depth = {}
     for slot in DEPTH_SLOTS:
         eligible = [p for p in players if player_can_play(p["position"], slot)]
@@ -244,15 +251,16 @@ def build_depth_chart(players):
     return depth
 
 
-# ── 主流程 ──────────────────────────────────────────────
+# ── Main flow ──────────────────────────────────────────────
 def analyze(roster, output=None, growth_until_age=21, growth_per_year=20):
     """
-    核心分析流程：计算 EA、选出最佳与次佳 11 人、生成深度图。
-    roster: 球员 dict 列表，每个含 name/age/position/ca/pa。
-    output: HTML 输出路径，默认 OUTPUT。
-    growth_until_age: EA 成长停止年龄（默认 21）。
-    growth_per_year:  EA 每岁成长值（默认 20）。
-    返回 HTML 字符串；roster 为空返回 None。
+    Core analysis flow: compute EA, pick the best and second-best XI,
+    and build the depth chart.
+    roster: list of player dicts, each with name/age/position/ca/pa.
+    output: HTML output path, defaults to OUTPUT.
+    growth_until_age: age at which EA growth stops (default 21).
+    growth_per_year:  EA growth per year of age (default 20).
+    Returns the HTML string, or None if roster is empty.
     """
     if not roster:
         print("未找到阵容数据")

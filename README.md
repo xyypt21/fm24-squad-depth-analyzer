@@ -13,6 +13,7 @@
 - 生成深度图，每个位置给出补强分（分数越高越需要补强）
 - 输出可视化 HTML 报告（球场阵型图 + 深度图）
 - 图形界面（tkinter）与命令行两种使用方式
+- `rtf_path` 支持 `~` 表示用户主目录，便于换机迁移
 
 ## 环境要求
 
@@ -42,7 +43,7 @@ python fm_analysis_gui.py
 python fm_analysis.py
 ```
 
-默认读取 `C:\Users\xyy\Documents\Sports Interactive\Football Manager 2024\team.rtf`，结果写入 `fm_analysis.html`。
+默认读取 `config.json` 中保存的路径（默认 `~\Documents\Sports Interactive\Football Manager 2024\team.rtf`），结果写入 `fm_analysis.html`。
 
 ### 作为模块调用
 
@@ -59,13 +60,13 @@ html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
 
 ```json
 {
-  "rtf_path": "C:\\Users\\xyy\\Documents\\Sports Interactive\\Football Manager 2024\\team.rtf",
+  "rtf_path": "~\\Documents\\Sports Interactive\\Football Manager 2024\\team.rtf",
   "growth_until_age": 21,
   "growth_per_year": 20
 }
 ```
 
-- `rtf_path`：阵容文件路径
+- `rtf_path`：阵容文件路径（`~` 展开为用户主目录）
 - `growth_until_age`：EA 成长停止年龄
 - `growth_per_year`：EA 每岁成长值
 
@@ -83,10 +84,13 @@ html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
 ## 项目结构
 
 ```
-fm_analysis.py       核心逻辑：RTF 解析、EA 计算、阵容分配、HTML 生成
+fm_analysis.py       核心逻辑：RTF 解析、EA 计算、阵容分配
+fm_report.py         HTML 报告渲染（从 templates/ 读取模板）
 fm_analysis_gui.py   tkinter 图形界面
 fm_analysis.html     生成的报告输出（被 gitignore 忽略）
 config.json          配置文件
+templates/style.css      报告样式表
+templates/report.html    报告 HTML 骨架（占位符替换）
 ```
 
 ## EA 补强分说明

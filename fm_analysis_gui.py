@@ -1,7 +1,7 @@
 """
-FM2024 4-2-3-1 阵容深度分析 - 图形界面版。
+FM2024 4-2-3-1 squad depth analysis - GUI version.
 
-用法：python fm_analysis_gui.py
+Usage: python fm_analysis_gui.py
 """
 
 import os
@@ -14,6 +14,16 @@ import fm_analysis as fa
 
 
 class FmGui:
+    @staticmethod
+    def _as_tilde_path(path):
+        """Convert an absolute path under the user home dir to a ~-relative one, for portability."""
+        try:
+            home = str(Path.home()).rstrip("\\/")
+            p = str(Path(path))
+            return "~" + p[len(home):] if p.startswith(home) else p
+        except Exception:
+            return path
+
     def __init__(self, root):
         self.root = root
         root.title("FM2024 阵容厚度分析")
@@ -84,7 +94,7 @@ class FmGui:
         )
 
     def browse_rtf(self):
-        current = Path(self.rtf_var.get())
+        current = Path(self.rtf_var.get()).expanduser()
         path = filedialog.askopenfilename(
             title="选择阵容文件",
             filetypes=[("RTF 文件", "*.rtf"), ("所有文件", "*.*")],
@@ -101,7 +111,7 @@ class FmGui:
             messagebox.showwarning("提示", "结果文件不存在，请先运行分析。")
 
     def start_analysis(self):
-        if not Path(self.rtf_var.get()).exists():
+        if not Path(self.rtf_var.get()).expanduser().exists():
             messagebox.showerror("错误", "阵容文件不存在，请检查路径。")
             return
         try:
@@ -114,7 +124,7 @@ class FmGui:
             return
         fa.save_config(
             {
-                "rtf_path": self.rtf_var.get(),
+                "rtf_path": self._as_tilde_path(self.rtf_var.get()),
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
             }
@@ -133,7 +143,7 @@ class FmGui:
 
     def _analyze(self, growth_until_age, growth_per_year):
         try:
-            rtf_path = Path(self.rtf_var.get())
+            rtf_path = Path(self.rtf_var.get()).expanduser()
             roster = fa.read_roster_from_rtf(rtf_path)
             html = fa.analyze(
                 roster,
