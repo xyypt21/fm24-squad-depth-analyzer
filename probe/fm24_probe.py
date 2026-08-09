@@ -19,9 +19,10 @@ FM24 内存探测工具 —— 在游戏运行时使用。
 import argparse
 import ctypes
 import glob
+import json
 import os
-import re
 import sys
+import tempfile
 from ctypes import wintypes as wt
 from pathlib import Path
 
@@ -329,43 +330,109 @@ def _club_name(mem, club_entry):
     return _read_len_str(mem, np)
 
 
+# ── 记录段缓存（跨运行复用，游戏未重启时地址稳定，免全内存扫描）──
+_REC_CACHE_PATH = Path(tempfile.gettempdir()) / "fm24_record_segments.json"
+
+
+def _cached_segments(mem):
+    """尝试从磁盘缓存读记录段列表并校验；无效返回 None。"""
+    try:
+        if not _REC_CACHE_PATH.exists():
+            return None
+        data = json.loads(_REC_CACHE_PATH.read_text(encoding="utf-8"))
+        pid = data.get("pid")
+        if pid != mem.pid:
+            return None
+        segs = data.get("segments")
+        if not segs:
+            return None
+        # 校验每段首条记录签名仍有效
+        for start, count in segs[:5]:
+            if mem.read_u32(start) != 0x45A4E958:
+                return None
+            if count > 1 and mem.read_u32(start + PLAYER_STRIDE) != 0x45A4E958:
+                return None
+        return segs
+    except Exception:
+        return None
+
+
+def _save_segment_cache(mem, segs):
+    try:
+        _REC_CACHE_PATH.write_text(
+            json.dumps({"pid": mem.pid, "segments": segs}), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def scan_player_segments(mem):
+    """返回记录段列表 [(start, count), ...]，优先用跨运行缓存。
+
+    游戏未重启/未重载存档时，记录段地址稳定；缓存命中即可完全跳过
+    全内存扫描（4GB 读取 → 只校验几条签名）。
+    """
+    cached = _cached_segments(mem)
+    if cached is not None:
+        return cached
+    recs = scan_player_records(mem)
+    segs = _record_segments(recs)
+    _save_segment_cache(mem, segs)
+    return segs
+
+
 def scan_player_records(mem):
     """全量扫描球员记录，返回记录起始地址列表（已按地址排序）。
 
     球员记录堆的基址随游戏更新/存档重载而变化（历史上见过 0xD..-0x13..、
     0xE.. 等），因此扫全内存而非锁定固定区间。签名 0x45A4E958 足够特异，
     全内存命中即为球员记录（实测 0x45A4E958 命中即 0x3E8 间距的记录）。
+
+    优化：只扫可写堆（PAGE_READWRITE/WRITECOPY），跳过代码页与只读页，
+    球员记录只可能存在于可写堆。实测全量 4GB -> 可写 2.9GB，快约 30%。
     """
-    return mem.scan_pattern(PLAYER_SIGNATURE, max_hits=400000)
+    return mem.scan_pattern(PLAYER_SIGNATURE, max_hits=400000, writable_only=True)
 
 
-def read_player(mem, rec):
-    """读取一条球员记录 -> dict（entity_id/name/ca/pa/birth/contract/current）。"""
-    # 记录内指针均为 64 位（游戏堆可能在 4GB 以上），用 read_u64 读指针
-    full = _read_len_str(mem, mem.read_u64(rec + P_NAME_FULL))
-    first = _read_len_str(mem, mem.read_u64(rec + P_NAME_FIRST))
-    last = _read_len_str(mem, mem.read_u64(rec + P_NAME_LAST))
+def read_player(mem, rec, raw=None):
+    """读取一条球员记录 -> dict（entity_id/name/ca/pa/birth/contract/current）。
+
+    raw: 预读的记录头 0x348 字节缓存（FastPath 时传入，减少 syscall）。
+    """
+    if raw is None:
+        raw = mem.read_bytes(rec, 0x348)
+    if not raw or len(raw) < 0x348:
+        return None
+
+    def _u64(off):
+        return int.from_bytes(raw[off:off + 8], "little")
+
+    def _u16(off):
+        return int.from_bytes(raw[off:off + 2], "little")
+
+    full = _read_len_str(mem, _u64(P_NAME_FULL))
+    first = _read_len_str(mem, _u64(P_NAME_FIRST))
+    last = _read_len_str(mem, _u64(P_NAME_LAST))
     name = full or ((first or "") + " " + (last or "")).strip() or None
-    ca = mem.read_u16(rec + P_CA)
-    pa = mem.read_u16(rec + P_PA)
-    year = mem.read_u16(rec + P_BIRTH_YEAR)
-    doy = mem.read_u16(rec + P_BIRTH_DOY)
+    ca = _u16(P_CA)
+    pa = _u16(P_PA)
+    year = _u16(P_BIRTH_YEAR)
+    doy = _u16(P_BIRTH_DOY)
     # 合同俱乐部：+832 -> S -> [S+0x10] -> 条目 -> struct [+0xC]
     contract = None
     club_entry = None
-    s_ptr = mem.read_u64(rec + P_CONTRACT_S)
+    s_ptr = _u64(P_CONTRACT_S)
     if s_ptr:
         s = mem.read_bytes(s_ptr, 0x18)
         if s and len(s) >= 0x18:
             s10 = int.from_bytes(s[0x10:0x18], "little")
             club_entry = s10
             contract = _club_parent(mem, s10)
-    # 当前俱乐部：+304 -> 条目 -> struct [+0xC]（父俱乐部，青年队自动归回本队）
-    current = _club_parent(mem, mem.read_u64(rec + P_CLUB_CUR))
-    # 位置：15 个 u8 熟练度 -> FM 位置串
-    pos_values = read_position(mem, rec)
+    # 当前位置：+304 -> 条目 -> struct [+0xC]（Parent club, youth auto归回本队）
+    current = _club_parent(mem, _u64(P_CLUB_CUR))
+    # 位置：15 个 u8 熟练度从 raw 直接切（一次读完整条记录，避免 15 次 syscall）
+    pos_values = [raw[P_POS_BASE + i] for i in range(15)]
     return {
-        "entity_id": mem.read_u32(rec + P_ENTITY_ID),
+        "entity_id": int.from_bytes(raw[P_ENTITY_ID:P_ENTITY_ID + 4], "little"),
         "name": name,
         "ca": ca,
         "pa": pa,
@@ -389,13 +456,162 @@ def doy_to_date(year, doy):
 
 def collect_roster(mem):
     """扫描并解析所有有俱乐部合同的球员，返回 player dict 列表。"""
+    segs = scan_player_segments(mem)
     players = []
-    for r in scan_player_records(mem):
-        p = read_player(mem, r)
+    for r, raw in _iter_record_raws(mem, segs):
+        p = read_player(mem, r, raw)
         if p["contract"] is None:
             continue
         players.append(p)
     return players
+
+
+def _record_segments(recs):
+    """把命中地址按 stride==PLAYER_STRIDE 连续分成段，返回 [(start, count), ...]。
+
+    球员记录是单一大数组的一段，段内地址严格相差 PLAYER_STRIDE，
+    可对整个段做一次 bulk read，避免每条记录一次 syscall。
+    若传入的本身就是段列表（start,count）也原样接受。
+    """
+    if recs and isinstance(recs[0], (list, tuple)):
+        return recs
+    segs = []
+    for r in recs:
+        if segs and r - (segs[-1][0] + (segs[-1][1] - 1) * PLAYER_STRIDE) == PLAYER_STRIDE:
+            segs[-1][1] += 1
+        else:
+            segs.append([r, 1])
+    return [(s[0], s[1]) for s in segs]
+
+
+def _iter_record_raws(mem, segs):
+    """按段批量读，产出 (rec_addr, raw) 迭代器。
+
+    同一段内一次 bulk write read（几百 KB），再按 stride 切出每条记录的头 0x348 字节。
+    """
+    for start, count in segs:
+        buf = mem.read_bytes(start, count * PLAYER_STRIDE)
+        if not buf:
+            continue
+        for i in range(count):
+            rec = start + i * PLAYER_STRIDE
+            yield rec, buf[i * PLAYER_STRIDE: i * PLAYER_STRIDE + 0x348]
+
+
+def _contract_uid(mem, raw, cache=None):
+    """从记录头 raw 解析合同俱乐部 uid（便宜路径：不读名字/位置）。
+
+    cache: dict {club_entry: contract_uid}。同俱乐部球员共享 club_entry，
+          命中俱乐部的记录很多，用 club_entry 作键可大幅复用。
+    失败返回 None。
+    """
+    if not raw or len(raw) < P_CONTRACT_S + 8:
+        return None
+    s_ptr = int.from_bytes(raw[P_CONTRACT_S:P_CONTRACT_S + 8], "little")
+    if not s_ptr:
+        return None
+    s = mem.read_bytes(s_ptr, 0x18)
+    if not s or len(s) < 0x18:
+        return None
+    s10 = int.from_bytes(s[0x10:0x18], "little")
+    if not s10:
+        return None
+    if cache is not None and s10 in cache:
+        return cache[s10]
+    uid = _club_parent(mem, s10)
+    if cache is not None:
+        cache[s10] = uid
+    return uid
+
+
+def collect_roster_for_club(mem, club_uid):
+    """扫描全量球员并按合同俱乐部过滤，返回该队球员 dict 列表（含名字解析）。
+
+    供 CLI / GUI 从内存直读阵容（替代 RTF 导出）使用。
+    优化：先走便宜路径只解析合同 uid（段内批量读 + 缓存），
+    仅对命中俱乐部的记录做完整解析（名字/位置）。
+    只算自有球员：合同队与当前队都 == club_uid（排除外租及租入）。
+    """
+    segs = scan_player_segments(mem)
+    cache = {}
+    cur_cache = {}
+    matches = []
+    for r, raw in _iter_record_raws(mem, segs):
+        if _contract_uid(mem, raw, cache) != club_uid:
+            continue
+        if _current_uid(mem, raw, cur_cache) != club_uid:
+            continue
+        matches.append((r, raw))
+    roster = []
+    for r, raw in matches:
+        p = read_player(mem, r, raw)
+        if p:
+            roster.append(p)
+    return roster
+
+
+def club_name(mem, club_uid):
+    """按俱乐部 uid 反查名字；找不到返回 None。"""
+    segs = scan_player_segments(mem)
+    cache = {}
+    for r, raw in _iter_record_raws(mem, segs):
+        if _contract_uid(mem, raw, cache) != club_uid:
+            continue
+        p = read_player(mem, r, raw)
+        if p and p["club_entry"]:
+            return _club_name(mem, p["club_entry"])
+        return None
+    return None
+
+
+def _current_uid(mem, raw, cache=None):
+    """从记录头 raw 解析当前俱乐部 uid（便宜路径，不读名字/位置）。
+
+    与 P_CLUB_CUR(+304) 不同：该指针直接指向俱乐部条目（56B），
+    用 _club_parent 归一化为父俱乐部 uid，才能与 contract 比较、
+    区分外租（contract==clr 但 current!=clr）。
+
+    cache: dict {当前俱乐部条目指针: uid}。
+    失败返回 None。
+    """
+    if not raw or len(raw) < P_CLUB_CUR + 8:
+        return None
+    entry = int.from_bytes(raw[P_CLUB_CUR:P_CLUB_CUR + 8], "little")
+    if not entry:
+        return None
+    if cache is not None and entry in cache:
+        return cache[entry]
+    uid = _club_parent(mem, entry)
+    if cache is not None:
+        cache[entry] = uid
+    return uid
+
+
+def club_squad(mem, club_uid):
+    """一次扫描返回 (队名, 该队球员 dict 列表)。找到返回 (None, [])。
+
+    CLI / GUI 的主力：全内存扫描（或缓存段）只做一次，扫描时即完成
+    过滤与队名反查。
+    只算自有球员：合同队与当前队都 == club_uid（排除外租及租入）。
+    """
+    segs = scan_player_segments(mem)
+    cache = {}
+    cur_cache = {}
+    matches = []
+    name = None
+    for r, raw in _iter_record_raws(mem, segs):
+        if _contract_uid(mem, raw, cache) != club_uid:
+            continue
+        # 外租球员：合同在队里，但当前俱乐部不在队里
+        if _current_uid(mem, raw, cur_cache) != club_uid:
+            continue
+        p = read_player(mem, r, raw)
+        if not p:
+            continue
+        if name is None and p["club_entry"]:
+            name = _club_name(mem, p["club_entry"])
+        matches.append(p)
+    return name, matches
 
 
 def _print_club_summary(mem, players):
@@ -406,7 +622,7 @@ def _print_club_summary(mem, players):
         if p["club_entry"]:
             club_names.setdefault(p["contract"], _club_name(mem, p["club_entry"]))
     counts = collections.Counter(p["contract"] for p in players)
-    print(f"\n[roster] 全部俱乐部球员数（前 40，uid/名字/人数）:")
+    print("\n[roster] 全部俱乐部球员数（前 40，uid/名字/人数）:")
     rows = sorted(((uid, club_names.get(uid), c) for uid, c in counts.items()),
                   key=lambda x: -x[2])
     for uid, name, c in rows[:40]:
@@ -417,16 +633,17 @@ def _print_club_summary(mem, players):
 def run_roster(mem, club_uid):
     """扫描所有球员，按合同俱乐部过滤并输出名单。club_uid 为 None 时输出俱乐部汇总。"""
     print("[roster] 扫描球员记录 ...")
-    recs = scan_player_records(mem)
-    print(f"    命中 {len(recs)} 条球员记录，逐条解析 ...")
+    segs = scan_player_segments(mem)
+    rec_count = sum(c for _, c in segs)
+    print(f"    命中 {rec_count} 条球员记录，逐条解析 ...")
     players = []
     club_names = {}
-    for r in recs:
-        p = read_player(mem, r)
-        if p["contract"] is None:
+    for r, raw in _iter_record_raws(mem, segs):
+        p = read_player(mem, r, raw)
+        if p and p["contract"] is None:
             continue
         players.append(p)
-        if p["club_entry"]:
+        if p and p["club_entry"]:
             club_names.setdefault(p["contract"], _club_name(mem, p["club_entry"]))
     print(f"    解析 {len(players)} 名有俱乐部合同的球员，涉及 {len(club_names)} 家俱乐部")
 
@@ -574,7 +791,6 @@ def main():
             if hits:
                 print(f"    命中 {len(hits)} 处:")
                 for h in hits[:8]:
-                    mod = mem.module("")
                     print(f"      0x{h:012X}")
             else:
                 print("    未命中（尝试用 --name 指定球员名/俱乐部名）")
@@ -597,3 +813,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -14,12 +14,35 @@ from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
-from scipy.optimize import linear_sum_assignment
 
 from fm_positions import SLOTS, player_can_play
 from fm_report import generate_full_html
 
 OUTPUT = Path(__file__).parent / "fm_analysis.html"
+
+
+def _translate_xi_names(*xis) -> None:
+    """只翻译最终出现在网页（入选阵容）里的球员名字。
+
+    对多组 XI 去重收集名字，一次性并发走 Google 在线翻译（经本地代理），
+    就地改 player dict 的 name，未命中的保持原样。
+    """
+    from fm_names import auto_translate  # noqa: PLC0415 延迟导入，加快启动
+
+    seen = set()
+    names = []
+    for xi in xis:
+        for _pos, p in xi:
+            if p["name"] not in seen:
+                seen.add(p["name"])
+                names.append(p["name"])
+    if not names:
+        return
+    translated = auto_translate(names)
+    for xi in xis:
+        for _pos, p in xi:
+            if p["name"] in translated:
+                p["name"] = translated[p["name"]]
 
 
 # ── EA calculation ─────────────────────────────────────────
@@ -55,6 +78,8 @@ def select_best_xi(candidates: List[dict], sort_key: str) -> List[tuple]:
     slot_count = len(SLOTS)
     max_key = max(p[sort_key] for p in candidates) if candidates else 200
     huge_penalty = max_key * slot_count * 2 + 1  # far beyond any valid cost sum
+
+    from scipy.optimize import linear_sum_assignment  # noqa: PLC0415 延迟导入，加快启动
 
     cost = np.full((slot_count, len(candidates)), huge_penalty, dtype=np.int32)
     for slot_i, slot_name in enumerate(SLOTS):
@@ -98,6 +123,9 @@ def analyze(
     ea_first = select_best_xi(candidates, "ea")
     used_ea = {id(p) for _, p in ea_first}
     ea_second = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
+
+    # 只翻译最终出现在网页（入选阵容）里的球员名字，避免多余请求
+    _translate_xi_names(ca_first, ca_second, ea_first, ea_second)
 
     html = generate_full_html(ca_first, ca_second, ea_first, ea_second)
     out = output or OUTPUT

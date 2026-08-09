@@ -268,7 +268,6 @@ class FmMemory:
         """从地址读 UTF-16LE 字符串（遇 \\0 截止）。"""
         if not address:
             return None
-        chunks = []
         buf = self.read_bytes(address, max_len * 2)
         if not buf:
             return None
@@ -276,8 +275,16 @@ class FmMemory:
         return s.split("\x00", 1)[0]
 
     # -- 内存区域遍历（供模式扫描用） --------------------------
-    def iter_regions(self, base=None, size=None, readable_only=True):
-        """遍历已提交、可读的内存区域，产出 (addr, size)。"""
+    def iter_regions(self, base=None, size=None, readable_only=True,
+                     writable_only=False, min_size=0):
+        """遍历已提交、可读的内存区域，产出 (addr, size)。
+
+        writable_only: 只看可写堆区（PAGE_READWRITE / WRITECOPY)，跳过可执行代码页、
+                       只读数据页，球员记录等数据都在这类区域，能显著加快扫描。
+        min_size: 过滤小于该字节数的碎片区域（否则 syscall 过多）。
+        """
+        PAGE_READWRITE = 0x04
+        PAGE_WRITECOPY = 0x08
         start = base if base is not None else 0
         end = (base + size) if base is not None and size else (1 << 63)
         addr = start
@@ -294,7 +301,12 @@ class FmMemory:
                 break
             protect = mbi.Protect
             readable = not (protect & PAGE_NOACCESS) and not (protect & PAGE_GUARD)
-            if mbi.State == MEM_COMMIT and (not readable_only or readable):
+            ok = mbi.State == MEM_COMMIT and (not readable_only or readable)
+            if ok and min_size and region_size < min_size:
+                ok = False
+            if ok and writable_only and not (protect & (PAGE_READWRITE | PAGE_WRITECOPY)):
+                ok = False
+            if ok:
                 yield region_addr, region_size
             # 前进：避免无限循环
             next_addr = region_addr + region_size
@@ -304,7 +316,8 @@ class FmMemory:
 
     # -- 模式扫描 ------------------------------------------------
     def scan_pattern(self, pattern, base=None, size=None, region_hint="module",
-                     chunk=0x100000, max_hits=64):
+                     chunk=0x100000, max_hits=64, writable_only=False,
+                     min_size=0):
         """
         全内存/模块内扫描字节模式。
         pattern: 支持 '??' 通配符的字节串，如 "4D 5A ?? 90 00"；
@@ -312,6 +325,8 @@ class FmMemory:
         返回命中地址列表（进程绝对地址）。
 
         优化：大块读取(1MB)；无通配符用 bytes.find，带通配符用 bytes 正则。
+        writable_only: 只扫可写堆区域（跳过代码页/只读页，可显著减扫描体积）。
+        min_size: 过滤小于该字节数的碎片区域。
         """
         if isinstance(pattern, str):
             parts = pattern.split()
@@ -343,7 +358,8 @@ class FmMemory:
                     yield m.start()
 
         hits = []
-        for addr, rsize in self.iter_regions(base, size):
+        for addr, rsize in self.iter_regions(base, size, writable_only=writable_only,
+                                             min_size=min_size):
             off = 0
             while off < rsize:
                 n = min(chunk, rsize - off)

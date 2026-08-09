@@ -1,31 +1,22 @@
 """
 FM2024 4-2-3-1 squad depth analysis - GUI version.
 
+Reads the squad directly from the running FM24 game memory.
+
 Usage: python fm_analysis_gui.py
 """
 
 import os
 import threading
 import tkinter as tk
-from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 
 from fm_analysis import OUTPUT, analyze
 from fm_config import load_config, save_config
-from fm_roster import read_roster_from_rtf
+from fm_roster import club_name_from_memory, read_squad_from_memory
 
 
 class FmGui:
-    @staticmethod
-    def _as_tilde_path(path):
-        """Convert an absolute path under the user home dir to a ~-relative one, for portability."""
-        try:
-            home = str(Path.home()).rstrip("\\/")
-            p = str(Path(path))
-            return "~" + p[len(home) :] if p.startswith(home) else p
-        except Exception:
-            return path
-
     def __init__(self, root):
         self.root = root
         root.title("FM2024 阵容厚度分析")
@@ -37,11 +28,17 @@ class FmGui:
         frm.pack(fill="both", expand=True)
 
         self._config = load_config()
-        self.rtf_var = tk.StringVar(value=self._config["rtf_path"])
+        self.club_var = tk.StringVar(value=str(self._config["club_uid"]))
 
-        ttk.Label(frm, text="阵容文件 (RTF):").grid(row=0, column=0, sticky="w", **pad)
-        ttk.Entry(frm, textvariable=self.rtf_var).grid(row=0, column=1, sticky="ew", **pad)
-        ttk.Button(frm, text="浏览...", command=self.browse_rtf).grid(row=0, column=2, **pad)
+        club_row = ttk.Frame(frm)
+        club_row.grid(row=0, column=0, columnspan=3, sticky="ew", **pad)
+        ttk.Label(club_row, text="俱乐部 ID:").pack(side="left")
+        ttk.Entry(club_row, textvariable=self.club_var, width=10).pack(side="left", padx=(0, 10))
+        self.club_name_var = tk.StringVar(value="")
+        self.fetch_name_btn = ttk.Button(club_row, text="查询名字", command=self.fetch_club_name)
+        self.fetch_name_btn.pack(side="left")
+        self.club_name_lbl = ttk.Label(club_row, textvariable=self.club_name_var, foreground="#555")
+        self.club_name_lbl.pack(side="left", padx=8)
 
         ea_row = ttk.Frame(frm)
         ea_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
@@ -98,15 +95,32 @@ class FmGui:
             f"年龄 ≥ {age} → EA = CA"
         )
 
-    def browse_rtf(self):
-        current = Path(self.rtf_var.get()).expanduser()
-        path = filedialog.askopenfilename(
-            title="选择阵容文件",
-            filetypes=[("RTF 文件", "*.rtf"), ("所有文件", "*.*")],
-            initialdir=str(current.parent) if current.exists() else os.path.expanduser("~"),
-        )
-        if path:
-            self.rtf_var.set(path)
+    def _get_club_uid(self):
+        return int(self.club_var.get())
+
+    def fetch_club_name(self):
+        try:
+            club_uid = self._get_club_uid()
+        except ValueError:
+            messagebox.showerror("错误", "俱乐部 ID 必须是整数。")
+            return
+        self.fetch_name_btn.configure(state="disabled")
+        self.status.set("查询中...")
+        thread = threading.Thread(target=self._fetch_name, args=(club_uid,), daemon=True)
+        thread.start()
+
+    def _fetch_club_name(self, club_uid):
+        try:
+            name = club_name_from_memory(club_uid)
+            text = f"俱乐部 {club_uid}: {name}" if name else f"未找到俱乐部 {club_uid}"
+        except Exception as exc:
+            text = f"查询失败: {exc}"
+        self.root.after(0, self._on_name_fetched, text)
+
+    def _on_name_fetched(self, text):
+        self.club_name_var.set(text)
+        self.fetch_name_btn.configure(state="normal")
+        self.status.set("就绪")
 
     def open_result(self):
         path = OUTPUT
@@ -116,10 +130,10 @@ class FmGui:
             messagebox.showwarning("提示", "结果文件不存在，请先运行分析。")
 
     def start_analysis(self):
-        if not Path(self.rtf_var.get()).expanduser().exists():
-            messagebox.showerror("错误", "阵容文件不存在，请检查路径。")
-            return
         try:
+            club_uid = self._get_club_uid()
+            if club_uid <= 0:
+                raise ValueError
             min_age = int(self.min_age_var.get())
             growth_until_age = int(self.ea_age_var.get())
             growth_per_year = int(self.ea_growth_var.get())
@@ -130,7 +144,7 @@ class FmGui:
             return
         save_config(
             {
-                "rtf_path": self._as_tilde_path(self.rtf_var.get()),
+                "club_uid": club_uid,
                 "min_age": min_age,
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
@@ -139,19 +153,20 @@ class FmGui:
         self.run_btn.configure(state="disabled")
         self.status.set("分析中...")
         self.log_line("-" * 40)
-        self.log_line(f"读取: {self.rtf_var.get()}")
-        self.log_line(f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}")
+        self.log_line(f"俱乐部 ID: {club_uid}")
+        self.log_line(
+            f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
+        )
         thread = threading.Thread(
             target=self._analyze,
-            args=(min_age, growth_until_age, growth_per_year),
+            args=(club_uid, min_age, growth_until_age, growth_per_year),
             daemon=True,
         )
         thread.start()
 
-    def _analyze(self, min_age, growth_until_age, growth_per_year):
+    def _analyze(self, club_uid, min_age, growth_until_age, growth_per_year):
         try:
-            rtf_path = Path(self.rtf_var.get()).expanduser()
-            roster = read_roster_from_rtf(rtf_path)
+            name, roster = read_squad_from_memory(club_uid)
             html = analyze(
                 roster,
                 output=OUTPUT,
@@ -160,9 +175,10 @@ class FmGui:
                 growth_per_year=growth_per_year,
             )
             if html:
-                message = f"完成：共 {len(roster)} 名球员，结果已写入 {OUTPUT}"
+                club = f"{club_uid}{(' ' + name) if name else ''}"
+                message = f"完成：俱乐部 {club} 共 {len(roster)} 名球员，结果已写入 {OUTPUT}"
             else:
-                message = "未找到阵容数据，请确认 RTF 文件格式正确。"
+                message = "未读到阵容数据，请确认游戏已运行且俱乐部 ID 正确。"
         except Exception as exc:
             message = f"分析出错：{exc}"
         self.root.after(0, self._on_done, message)
