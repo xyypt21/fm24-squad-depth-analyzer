@@ -58,7 +58,7 @@ python fm_cli.py --club <uid>
 To find your club's UID, use the probe tool:
 
 ```bash
-python probe/fm24_probe.py --roster
+python fm24_probe.py --roster
 ```
 
 ### As a module
@@ -96,18 +96,16 @@ If the file is missing or corrupt, defaults are used automatically.
 ```
 fm_analysis_gui.py   tkinter GUI
 fm_cli.py            Command-line entry point
-fm_config.py         Config file loading/saving
-fm_positions.py      Formation slots and position parsing
 fm_roster.py         Memory reading: squad and club name
-fm_analysis.py       Core logic: EA calculation, lineup selection, name translation
-fm_report.py         HTML report rendering (reads templates from templates/)
-fm_names.py          Online player-name translation (Google, via local proxy)
+fm_analysis.py       Core: config, position parsing, EA calculation, lineup selection,
+                     name translation, HTML report rendering
+fm_memory.py         Generic read-only memory reader (ctypes, Windows API)
+fm24_probe.py        FM24-specific offsets, scanning and squad extraction
+fm_offsets_info.json FM Scouting Tool reference offset table
 fm_analysis.html     Generated report output (ignored by git)
 config.json          Configuration file
 templates/style.css   Report stylesheet
 templates/report.html Report HTML skeleton (placeholder-based)
-probe/fm_memory.py   Generic read-only memory reader (ctypes, Windows API)
-probe/fm24_probe.py  FM24-specific offsets, scanning and squad extraction
 ```
 
 ## Name Translation
@@ -117,4 +115,4 @@ Names that make it into the final XIs are translated to Chinese in one concurren
 ## Notes
 
 - The game must be running with a save loaded. If the game runs as administrator, run this tool as administrator too.
-- Offsets in `probe/fm24_probe.py` are locked to the current FM24 build (Epic version). If a game update breaks them, re-observe the offsets (see the comments in the file).
+- Offsets in `fm24_probe.py` are locked to the current FM24 build (Epic version). If a game update breaks them, re-observe the offsets (see the comments in the file).

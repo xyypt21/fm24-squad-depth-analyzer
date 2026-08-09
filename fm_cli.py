@@ -4,8 +4,7 @@ import argparse
 import os
 import sys
 
-from fm_analysis import OUTPUT, analyze
-from fm_config import load_config
+from fm_analysis import OUTPUT, analyze, load_config
 from fm_roster import read_squad_from_memory
 
 

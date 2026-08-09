@@ -2,7 +2,9 @@
 FM2024 4-2-3-1 squad depth analysis core.
 
 Computes EA (Expected Ability) for every player and uses the Hungarian algorithm
-to pick the best and second-best starting XI for both CA and EA.
+to pick the best and second-best starting XI for both CA and EA, then renders
+an HTML report. Also loads/saves the config file, parses FM position strings,
+and optionally translates selected player names to Chinese.
 
 EA (Expected Ability) = CA + growth potential
   age < growth_until_age  EA = CA + (growth_until_age - age) × growth_per_year
@@ -10,15 +12,189 @@ EA (Expected Ability) = CA + growth potential
   EA capped at PA
 """
 
+import json
+import os
+import re
+import socket
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 
-from fm_positions import SLOTS, player_can_play
-from fm_report import generate_full_html
-
 OUTPUT = Path(__file__).parent / "fm_analysis.html"
+CONFIG_PATH = Path(__file__).parent / "config.json"
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "club_uid": 920,
+    "min_age": 17,
+    "growth_until_age": 21,
+    "growth_per_year": 20,
+}
+
+
+# ── Config file loading/saving ────────────────────────────
+def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
+    """Read the config file, falling back to defaults if missing or corrupt."""
+    path = Path(path) if path else CONFIG_PATH
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return dict(DEFAULT_CONFIG)
+    merged = {**DEFAULT_CONFIG, **data}
+    return {
+        "club_uid": int(merged["club_uid"]),
+        "min_age": int(merged["min_age"]),
+        "growth_until_age": int(merged["growth_until_age"]),
+        "growth_per_year": int(merged["growth_per_year"]),
+    }
+
+
+def save_config(config: Dict[str, Any], path: Optional[Path] = None) -> None:
+    """Write the config back to the file."""
+    path = Path(path) if path else CONFIG_PATH
+    path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+# ── Formation slots and FM position parsing ──────────────
+# 4-2-3-1 starting XI, ordered top-to-bottom as the pitch is drawn.
+SLOTS: List[str] = ["GK", "DL", "DC", "DC", "DR", "DMC", "DMC", "AML", "AMC", "AMR", "STC"]
+
+# Valid FM role names and side letters.
+VALID_ROLES: Set[str] = {"GK", "D", "WB", "DM", "M", "AM", "ST"}
+VALID_SIDES: Set[str] = {"C", "L", "R"}
+
+# Full valid position token set (role + side combinations).
+VALID_POSITION_TOKENS: Set[str] = {
+    "GK",
+    "WBL",
+    "WBR",
+    "DMC",
+    "STC",
+    *(r + s for r in ("D", "M", "AM") for s in VALID_SIDES),
+}
+
+
+def parse_position_tokens(position_text: str) -> List[str]:
+    """
+    Split an FM position string into "role+side" tokens, keeping only valid ones.
+    Roles without parentheses are treated as centre (+C), e.g. "DM" -> ["DMC"].
+
+    Examples:
+      "M (L), AM (RLC)"     -> ["ML", "AMR", "AML", "AMC"]
+      "D/WB (R)"            -> ["DR", "WBR"]
+      "ST (C)"              -> ["STC"]
+      "DM"                  -> ["DMC"]
+      "GK"                  -> ["GK"]
+    """
+    tokens: List[str] = []
+    # Grab each "role(sides)" chunk in one regex pass, skipping commas/spaces.
+    # E.g. "M (L), AM (RLC)" yields (M, L) then (AM, RLC)
+    for roles_text, sides_text in re.findall(
+        r"([A-Z/]+)\s*(?:\(([A-Z]+)\))?", position_text.upper()
+    ):
+        # Handle compound roles like D/WB, taking D and WB one by one.
+        for role in roles_text.split("/"):
+            if role not in VALID_ROLES:
+                continue
+            if sides_text:
+                # Sides in parentheses: validate them, then build one token each.
+                if all(s in VALID_SIDES for s in sides_text):
+                    tokens.extend(role + s for s in sides_text)
+            else:
+                # No parentheses: GK stays GK, other roles treated as centre,
+                # e.g. DM -> DMC.
+                tokens.append("GK" if role == "GK" else role + "C")
+    # Safety filter: drop any token not in the valid position table.
+    return [t for t in tokens if t in VALID_POSITION_TOKENS]
+
+
+def player_can_play(position_text: str, slot_name: str) -> bool:
+    """Check whether a player can fill a formation slot."""
+    return slot_name in parse_position_tokens(position_text)
+
+
+# ── Online name translation (Google via local proxy) ─────
+# 进程内在线翻译缓存与失败黑名单（避免重复请求）
+_cache: dict = {}
+_failed: set = set()
+
+# 本地代理（Clash 等默认端口 7897），走境外 Google 翻译必需。
+# 可通过环境变量 FM_PROXY 覆盖，空字符串/None 表示不走代理。
+PROXY_URL = os.environ.get("FM_PROXY", "http://127.0.0.1:7897")
+
+# 单次请求超时（deep-translator 未显式设 timeout，代理不通会无限阻塞）
+_REQUEST_TIMEOUT = 10
+# 并发翻译线程数
+_MAX_WORKERS = 4
+# 单个名字失败重试次数
+_RETRIES = 2
+
+
+def _proxies():
+    if not PROXY_URL:
+        return None
+    return {"http": PROXY_URL, "https": PROXY_URL}
+
+
+def _translate_one(name, translator):
+    """翻译单个名字（失败重试）；成功写内存缓存，最终失败加入黑名单。"""
+    for _ in range(_RETRIES):
+        try:
+            cn = translator.translate(name)
+            cn = (cn or "").strip()
+            if cn and cn != name:
+                _cache[name] = cn
+                return name, cn
+        except Exception:
+            continue
+    _failed.add(name)
+    return name, None
+
+
+def _batch_translate(names):
+    """批量翻译一批名字：并发走 Google 翻译（经本地代理）。
+
+    返回 {name: 中文}；翻译异常/未命中的名字不返回（由调用方原样保留）。
+    只走内存缓存，不写文件。
+    """
+    todo = []
+    result = {}
+    for n in names:
+        if n in _cache:
+            result[n] = _cache[n]
+        elif n not in _failed:
+            todo.append(n)
+    if not todo:
+        return result
+
+    try:
+        from deep_translator import GoogleTranslator  # noqa: PLC0415 延迟导入，加快启动
+
+        # deep-translator 未设 socket 超时，代理不通会无限阻塞；设全局默认超时兜底
+        _previous = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(_REQUEST_TIMEOUT)
+        try:
+            # 复用同一个 translator（requests 内部复用连接），并发翻译
+            translator = GoogleTranslator(source="auto", target="zh-CN", proxies=_proxies())
+            with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
+                futs = {pool.submit(_translate_one, n, translator) for n in todo}
+                for fut in futs:
+                    name, cn = fut.result()
+                    if cn:
+                        result[name] = cn
+        finally:
+            socket.setdefaulttimeout(_previous)
+    except ImportError:
+        pass
+    return result
+
+
+def auto_translate(names):
+    """翻译一批英文名，全部走 Google 在线翻译（经本地代理），并发执行。"""
+    names = tuple(dict.fromkeys(names))
+    if not names:
+        return {}
+    return _batch_translate(names)
 
 
 def _translate_xi_names(*xis) -> None:
@@ -27,8 +203,6 @@ def _translate_xi_names(*xis) -> None:
     对多组 XI 去重收集名字，一次性并发走 Google 在线翻译（经本地代理），
     就地改 player dict 的 name，未命中的保持原样。
     """
-    from fm_names import auto_translate  # noqa: PLC0415 延迟导入，加快启动
-
     seen = set()
     names = []
     for xi in xis:
@@ -89,6 +263,77 @@ def select_best_xi(candidates: List[dict], sort_key: str) -> List[tuple]:
 
     row_indices, col_indices = linear_sum_assignment(cost)
     return [(SLOTS[row], candidates[col]) for row, col in zip(row_indices, col_indices)]
+
+
+# ── HTML report rendering ─────────────────────────────────
+def compute_average(xi, sort_key):
+    """Compute the average score of a starting XI."""
+    return int(sum(p[sort_key] for _, p in xi) / len(xi)) if xi else 0
+
+
+def is_weak(player_ea, ref):
+    return player_ea < ref * 0.9
+
+
+def render_player_slot(slot_name, player, sort_key, reference_value):
+    """Render the HTML for a single player slot."""
+    weak = " slot-weak" if is_weak(player[sort_key], reference_value) else ""
+    return (
+        f"<div class='slot{weak}'>"
+        f"<div class='slot-label'>{slot_name}</div>"
+        f"<div class='p-name'>{player['name']}</div>"
+        f"<div class='p-stat'>{player['age']}岁 · CA{player['ca']} · EA{player['ea']:.0f}</div>"
+        f"</div>"
+    )
+
+
+def render_pitch(xi, sort_key, reference_value):
+    """
+    Render the 11-man pitch diagram.
+    Row layout: STC / AML,AMC,AMR / DMC,DMC / DL,DC,DC,DR / GK
+    """
+
+    def slot_html(index):
+        if index >= len(xi):
+            return "<div class='slot' style='visibility:hidden;'></div>"
+        slot_name, player = xi[index]
+        return render_player_slot(slot_name, player, sort_key, reference_value)
+
+    row_indices = [(10,), (7, 8, 9), (5, 6), (1, 2, 3, 4), (0,)]
+    rows = [
+        "<div class='f-row'>" + "".join(slot_html(i) for i in indices) + "</div>"
+        for indices in row_indices
+    ]
+    return "\n".join(rows)
+
+
+def render_pitch_card(xi, sort_key, reference=None):
+    """Render a full pitch card."""
+    average = compute_average(xi, sort_key)
+    if not xi:
+        return (
+            "<div class='pitch' style='display:flex;align-items:center;"
+            "justify-content:center;color:rgba(255,255,255,0.5);font-size:14px;'>"
+            "球员不足</div>"
+        )
+    return f"<div class='pitch'>{render_pitch(xi, sort_key, reference or average)}</div>"
+
+
+def generate_full_html(ca_first, ca_second, ea_first, ea_second):
+    template_dir = Path(__file__).parent / "templates"
+    template = (template_dir / "report.html").read_text(encoding="utf-8")
+    css = (template_dir / "style.css").read_text(encoding="utf-8")
+    return (
+        template.replace("{{CSS_STYLE}}", css)
+        .replace("{{PITCH_CA_BEST}}", render_pitch_card(ca_first, "ca"))
+        .replace("{{PITCH_CA_SECOND}}", render_pitch_card(ca_second, "ca"))
+        .replace("{{PITCH_EA_BEST}}", render_pitch_card(ea_first, "ea"))
+        .replace("{{PITCH_EA_SECOND}}", render_pitch_card(ea_second, "ea"))
+        .replace("{{AVG_CA_BEST}}", str(compute_average(ca_first, "ca")))
+        .replace("{{AVG_CA_SECOND}}", str(compute_average(ca_second, "ca")))
+        .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
+        .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
+    )
 
 
 # ── Main flow ──────────────────────────────────────────────

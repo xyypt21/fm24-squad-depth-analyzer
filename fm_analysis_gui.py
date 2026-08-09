@@ -11,8 +11,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from fm_analysis import OUTPUT, analyze
-from fm_config import load_config, save_config
+from fm_analysis import OUTPUT, analyze, load_config, save_config
 from fm_roster import club_name_from_memory, read_squad_from_memory
 
 

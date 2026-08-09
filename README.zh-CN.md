@@ -58,7 +58,7 @@ python fm_cli.py --club <uid>
 查找自己俱乐部的 UID：
 
 ```bash
-python probe/fm24_probe.py --roster
+python fm24_probe.py --roster
 ```
 
 ### 作为模块调用
@@ -96,18 +96,16 @@ html = analyze(roster, min_age=17, growth_until_age=21, growth_per_year=20)
 ```
 fm_analysis_gui.py   tkinter 图形界面
 fm_cli.py            命令行入口
-fm_config.py         配置文件读写
-fm_positions.py      阵型槽位与位置解析
 fm_roster.py         内存读取：阵容与俱乐部名
-fm_analysis.py       核心逻辑：EA 计算、阵容分配、球员名翻译
-fm_report.py         HTML 报告渲染（从 templates/ 读取模板）
-fm_names.py          球员名在线翻译（Google 翻译，经本地代理）
+fm_analysis.py       核心：配置、位置解析、EA 计算、阵容分配、
+                     球员名翻译、HTML 报告渲染
+fm_memory.py         通用只读内存读取层（ctypes，Windows API）
+fm24_probe.py        FM24 专属偏移、内存扫描与阵容提取
+fm_offsets_info.json FM Scouting Tool 参考偏移表
 fm_analysis.html     生成的报告输出（被 gitignore 忽略）
 config.json          配置文件
 templates/style.css      报告样式表
 templates/report.html    报告 HTML 骨架（占位符替换）
-probe/fm_memory.py   通用只读内存读取层（ctypes，Windows API）
-probe/fm24_probe.py  FM24 专属偏移、内存扫描与阵容提取
 ```
 
 ## 球员名翻译
@@ -117,4 +115,4 @@ probe/fm24_probe.py  FM24 专属偏移、内存扫描与阵容提取
 ## 注意事项
 
 - 游戏需已启动并载入存档。若游戏以管理员权限运行，本工具也需以管理员权限运行。
-- `probe/fm24_probe.py` 中的偏移锁定当前 FM24 构建（Epic 版）。游戏更新导致失效时，需按文件内注释重新观察偏移。
+- `fm24_probe.py` 中的偏移锁定当前 FM24 构建（Epic 版）。游戏更新导致失效时，需按文件内注释重新观察偏移。
