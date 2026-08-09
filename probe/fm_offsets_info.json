@@ -1,0 +1,2940 @@
+{
+  "schema_version": 1,
+  "versions": [
+    {
+      "fm_version": "24.4.2+2081827",
+      "person_base": {
+        "ACTUAL_PLAYER": "0x278",
+        "ACTUAL_NON_PLAYER": "0x0F8",
+        "ACTUAL_PLAYER_AND_NON_PLAYER": "0x368",
+        "HUMAN_NON_PLAYER": "0x450"
+      },
+      "birth_date_offset": "0x2BC",
+      "regen_uid_threshold": 2002068000,
+      "chain": {
+        "person_root_rva": "0x642ED38",
+        "container_off": "0x80"
+      },
+      "savegame_id_chain": {
+        "module": "fm.exe",
+        "savegame_id_rva": "0x63659C0",
+        "alt_rva": "0x6434EE0",
+        "field_off": "0x90",
+        "session_nonce_off": "0xA0"
+      },
+      "save_name": {
+        "module": "fm.exe",
+        "owners": [
+          {
+            "rtti": ".?AVSAVE_SYSTEM@@",
+            "name_off": "0x20"
+          },
+          {
+            "rtti": ".?AVGAME_GAME_DATABASE_RECORD@@",
+            "name_off": "0x8"
+          }
+        ]
+      },
+      "game_date_chain": {
+        "game_date_rva": "0x631D5BC"
+      },
+      "person_table_chain": {
+        "person_root_rva": "0x642ED38",
+        "container_off": "0x80",
+        "anchor_uid": 28108494
+      },
+      "human_manager_chain": {
+        "mgr_hnp_rva": "0x6365118",
+        "hnp_vtable_rva": "0x5A6A388",
+        "hmgr_start_off": "0x18",
+        "hmgr_end_off": "0x20",
+        "human_manager_offset": "0x450"
+      },
+      "human_manager_rtti": ".?AVHUMAN_NON_PLAYER@db@@",
+      "vtable_rvas": {
+        "ptr_person_ap": "0x5A4EE78",
+        "ptr_person_anp": "0x5A4C358",
+        "ptr_person_apnp": "0x5C7ECB8",
+        "ptr_person_hnp": "0x5A6A388",
+        "entity_ap": "0x5A4E958",
+        "entity_anp": "0x5A4C2E8",
+        "entity_apnp": "0x5C7E798",
+        "entity_hnp": "0x5A6A318",
+        "vtb_club": "0x5A51F38",
+        "vtb_team": "0x5A78848",
+        "vtb_comp": "0x5A54A38"
+      },
+      "rtti_player_types": [
+        ".?AVACTUAL_PLAYER@db@@",
+        ".?AVACTUAL_PLAYER_AND_NON_PLAYER@db@@"
+      ],
+      "rtti_club_types": [
+        ".?AVCLUB@db@@"
+      ],
+      "rtti_team_types": [
+        ".?AVTEAM@db@@"
+      ],
+      "rtti_comp_types": [
+        ".?AVCOMP@db@@"
+      ],
+      "nplo_offsets": {
+        "apanp_staff_off": "0x270",
+        "home_rep": "0xD0",
+        "cur_rep": "0xD2",
+        "world_rep": "0xD4",
+        "ca": "0xD6",
+        "pa": "0xD8",
+        "tendencies_ptr": "0xA4",
+        "scouting_knowledge_ptr": "0xAC",
+        "coaching_style": "0xE1",
+        "preferred_formation": "0xDB",
+        "second_formation": "0xDC",
+        "defensive_formation": "0xDD",
+        "attacking_formation": "0xDE",
+        "attrs_base": "0x18",
+        "coaching_license_from_person": "0x16A"
+      },
+      "staff_attrs_u8": {
+        "tactical_attacking": "0x18",
+        "chairman_business": "0x19",
+        "tactical_depth_technique": "0x1A",
+        "tactical_directness": "0x1B",
+        "mental_authority": "0x1C",
+        "tactical_free_roles": "0x1D",
+        "chairman_interference": "0x1E",
+        "tactical_marking": "0x1F",
+        "tactical_offside": "0x20",
+        "chairman_patience": "0x21",
+        "tactical_pressing_intensity": "0x22",
+        "chairman_resources": "0x23",
+        "coaching_working_with_youngsters": "0x24",
+        "non_tactical_buying_players": "0x26",
+        "non_tactical_mind_games": "0x27",
+        "tactical_sitting_back": "0x28",
+        "tactical_use_of_playmaker": "0x29",
+        "tactical_use_of_substitutions": "0x2A",
+        "tactical_defensive_line": "0x2B",
+        "tactical_fluidity": "0x2C",
+        "tactical_flexibility": "0x2D",
+        "non_tactical_hardness_of_training": "0x2E",
+        "non_tactical_squad_rotation": "0x2F",
+        "tactical_tempo": "0x30",
+        "tactical_width": "0x31"
+      },
+      "staff_attrs_fm": {
+        "mental_determination": "0x25",
+        "coaching_goalkeeping": "0x33",
+        "judging_player_ability": "0x34",
+        "judging_player_potential": "0x35",
+        "people_management": "0x36",
+        "motivating": "0x37",
+        "physiotherapy": "0x38",
+        "tactical_knowledge": "0x39",
+        "coaching_attacking": "0x3A",
+        "coaching_defending": "0x3B",
+        "coaching_fitness": "0x3C",
+        "coaching_possession": "0x3D",
+        "coaching_technical": "0x3E",
+        "coaching_tactical": "0x3F",
+        "tactical_dirtiness_allowance": "0x40",
+        "non_tactical_versatility": "0x43",
+        "analysing_data": "0x44",
+        "sports_science": "0x47",
+        "tactical_eccentricity": "0x48",
+        "negotiating": "0x49",
+        "judging_staff_ability": "0x4A",
+        "coaching_set_pieces": "0x4B"
+      },
+      "mano_offsets": {
+        "mcha": "0x43A",
+        "scouting_centre_ptr": "0x370",
+        "ppro": "0x108",
+        "pfl1": "0x404",
+        "pfl2": "0x405"
+      },
+      "mano_characteristics": {
+        "ambition": "0x0",
+        "loyalty": "0x1",
+        "adaptability": "0x2",
+        "pressure": "0x3",
+        "professionalism": "0x4",
+        "sportsmanship": "0x5",
+        "controversy": "0x6"
+      },
+      "mano_scouting_offsets": {
+        "budget_season": "0xEF4",
+        "budget_available": "0xEF8",
+        "recruitment_package": "0xF00"
+      },
+      "currency_table_chain": {
+        "currency_root_rva": "0x642ED00",
+        "container_off": "0x80"
+      },
+      "currency_record_offsets": {
+        "uid": "0x0C",
+        "full_name": "0x18",
+        "short_name": "0x20",
+        "symbol": "0x30",
+        "exchange_rate": "0x38"
+      },
+      "club_table_chain": {
+        "club_root_rva": "0x642ECE0",
+        "container_off": "0x80"
+      },
+      "team_table_chain": {
+        "team_root_rva": "0x642ED68",
+        "container_off": "0x80"
+      },
+      "comp_table_chain": {
+        "comp_root_rva": "0x642ECE8",
+        "container_off": "0x80"
+      },
+      "club_offsets": {
+        "uid": "0x0C",
+        "status": "0x16A",
+        "name_full": "0xC0",
+        "name_short": "0xC8",
+        "nation_ptr": "0xD8",
+        "first_team_container": "0x18",
+        "cino_ptr": "0xB0",
+        "cint_ptr": "0x100",
+        "fin_ptr": "0x150"
+      },
+      "club_cino_offsets": {
+        "avg_attendance": "0x68",
+        "min_attendance": "0x6C",
+        "max_attendance": "0x70",
+        "pref_formation": "0x74",
+        "nickname": "0x90",
+        "fg_color": "0xA0",
+        "bg_color": "0xA8"
+      },
+      "formation_enum": {
+        "0": "Not Set",
+        "2": "5-3-2 WB",
+        "3": "4-4-2",
+        "4": "4-3-3 DM Wide",
+        "6": "3-5-2",
+        "7": "4-4-2 Diamond Narrow",
+        "8": "4-5-1",
+        "9": "3-4-3",
+        "10": "3-4-1-2",
+        "11": "3-4-2-1",
+        "12": "4-3-2-1 Narrow",
+        "14": "4-3-1-2 Narrow",
+        "15": "5-4-1 Diamond WB",
+        "16": "4-4-1-1",
+        "18": "4-2-3-1 Narrow",
+        "19": "4-1-3-1-1 DM AM Narrow",
+        "20": "4-1-3-2 DM Narrow",
+        "21": "4-2-3-1 Wide",
+        "22": "4-4-2 2DM",
+        "23": "4-3-3 2DM Wide",
+        "24": "4-2-2-2 DM Narrow",
+        "25": "3-1-3-1-2 DM",
+        "26": "4-3-3 DM Narrow",
+        "27": "4-3-2-1 DM AM Narrow",
+        "28": "4-2-4 DM Wide",
+        "29": "4-2-3-1 DM AM Wide",
+        "30": "5-3-2 DM WB",
+        "31": "3-4-2-1 DM",
+        "32": "4-1-4-1 DM",
+        "33": "4-4-1-1 2DM",
+        "34": "3-2-3-2 DM",
+        "35": "5-2-3 DM Wide",
+        "36": "4-3-3 Narrow",
+        "38": "5-4-1",
+        "40": "4-2-3-1 DM AM Narrow",
+        "41": "5-2-1-2 WB",
+        "42": "5-1-2-2 DM Narrow",
+        "47": "5-2-3 Narrow",
+        "50": "4-1-4-1 DM Asm AM(R)",
+        "51": "4-2-4-0 DM Wide",
+        "52": "4-1-3-2 DM",
+        "53": "4-1-4-1 DM Asm AM(L)",
+        "54": "4-5-1 2DM",
+        "55": "4-5-1-0 2DM",
+        "56": "5-1-3-1 DM WB",
+        "57": "5-2-2-1 DM",
+        "58": "5-2-2-1-0 DM",
+        "59": "5-2-2-1 WB",
+        "60": "3-1-4-2 DM",
+        "61": "5-2-3 WB Wide",
+        "62": "4-2-2-2 DM AM Narrow",
+        "63": "5-2-2-1 DM AM",
+        "64": "5-2-1-2 DM AM"
+      },
+      "club_cint_offsets": {
+        "six_letter_name": "0x00",
+        "season_ticket_holders": "0xC0",
+        "year_founded": "0xD8",
+        "chairman_status": "0xDE",
+        "social_media_followers": "0xF8",
+        "social_stature": "0xFC",
+        "social_trendiness": "0xFE",
+        "supporter_loyalty": "0x114",
+        "supporter_passion": "0x115",
+        "supporter_patience": "0x116",
+        "supporter_affluence": "0x117",
+        "supporter_temperament": "0x118",
+        "supporter_expectations": "0x119",
+        "training_facilities": "0x120",
+        "morale": "0x121",
+        "youth_importance": "0x126",
+        "ownership_type": "0x129",
+        "chairman_title": "0x12A",
+        "youth_facilities": "0x12B",
+        "youth_coaching": "0x12C",
+        "youth_recruitment": "0x12D"
+      },
+      "chairman_title_enum": {
+        "0": "Not Set",
+        "1": "Chairman",
+        "2": "President",
+        "3": "General Manager"
+      },
+      "ownership_type_enum": {
+        "1": "Limited Liability Company",
+        "2": "Public Limited Company",
+        "3": "Member Owned (Elections)",
+        "4": "Member Owned (No Elections)",
+        "5": "Consortium Private Limited",
+        "6": "Consortium Public Limited"
+      },
+      "club_fin_offsets": {
+        "balance": "0x14",
+        "transfer_budget_current": "0x7CC",
+        "transfer_budget_season": "0x7D0",
+        "transfer_revenue_pct": "0x7D8",
+        "wage_budget": "0x810",
+        "max_wage_allowed": "0x814",
+        "wage_total": "0x818",
+        "wage_total_with_bonus": "0x81C",
+        "corporate_facilities": "0x8B5"
+      },
+      "comp_offsets": {
+        "uid": "0x0C",
+        "name_full": "0x40",
+        "name_short": "0x48",
+        "name_3letter": "0x50",
+        "continent_ptr": "0x58",
+        "nation_ptr": "0x60",
+        "cacm_ptr": "0xB0",
+        "clubs_foreign_eligible": "0x120",
+        "clubs_bottom_div": "0x124",
+        "clubs_total": "0x128",
+        "clubs_wildcard": "0x14C",
+        "pitch_min_length_dm": "0x154",
+        "pitch_min_width_dm": "0x156",
+        "pitch_max_length_dm": "0x158",
+        "pitch_max_width_dm": "0x15A",
+        "div_position": "0x17E",
+        "reputation": "0x180",
+        "original_rep": "0x182",
+        "squad_status_threshold": "0x198",
+        "level": "0x199",
+        "comp_type": "0x19C",
+        "league_or_cup": "0x19E",
+        "flags": "0x1A0",
+        "db_type_active": "0xF4",
+        "comp_category": "0xF8"
+      },
+      "comp_category_enum": {
+        "0": "Domestic Top Division",
+        "1": "Domestic Division",
+        "2": "Domestic Main Cup",
+        "3": "Domestic League Cup",
+        "4": "Domestic Cup",
+        "5": "Super Cup",
+        "6": "International Finals",
+        "7": "International Qualifiers",
+        "8": "Reserve Division",
+        "9": "Club Friendly",
+        "10": "Main Continental International Finals",
+        "11": "Main Continental International Qualifiers",
+        "12": "Club Finals",
+        "13": "Friendly",
+        "14": "Domestic Other Division",
+        "15": "U21 International Finals",
+        "16": "U21 International Qualifiers",
+        "17": "U19 International Finals",
+        "18": "U19 International Qualifiers",
+        "19": "U23 International Finals",
+        "20": "U23 International Qualifiers",
+        "21": "Club Champions Cup",
+        "22": "Cup Winners Cup",
+        "23": "Reserve Cup",
+        "24": "International Friendly",
+        "25": "U20 International Finals",
+        "26": "All Stars Cup",
+        "27": "U20 International Qualifiers",
+        "28": "Inactive Competition",
+        "29": "Inactive Other Competition",
+        "31": "U22 International Finals",
+        "32": "U22 International Qualifiers",
+        "33": "U23 Division",
+        "34": "U22 Division",
+        "35": "U21 Division",
+        "36": "U20 Division",
+        "37": "U19 Division",
+        "38": "U18 Division",
+        "39": "Youth Cup"
+      },
+      "nation_offsets": {
+        "nation_name_ptr": "0x18",
+        "short_name_ptr": "0x20",
+        "abbrev_3letter_ptr": "0x28",
+        "name_blob_ptr": "0x30"
+      },
+      "cono_offsets": {
+        "name": "0x18",
+        "abbrev_3letter": "0x20",
+        "city_ptr": "0x28",
+        "federation_name": "0x30",
+        "six_letter_name": "0x38",
+        "short_name": "0x40",
+        "total_clubs": "0x48",
+        "bottom_clubs": "0x4C",
+        "top_clubs": "0x50",
+        "adv_rules": "0x60",
+        "regions": "0xA0"
+      },
+      "comp_league_chain": {
+        "cacm_off": "0xB0",
+        "clge_off_in_cacm": "0x1C0"
+      },
+      "team_offsets": {
+        "uid": "0x0C",
+        "team_type": "0x28",
+        "min_age": "0x2C",
+        "max_age": "0x2D",
+        "club_ptr": "0x30",
+        "player_roster_begin": "0x38",
+        "comp_ptr": "0x50",
+        "next_comp_ptr": "0x58",
+        "stadium_ptr": "0x78",
+        "manager_ptr": "0x80",
+        "reputation": "0xA8"
+      },
+      "stadium_offsets": {
+        "name_blob_ptr": "0x38"
+      },
+      "retirement_table_chain": {
+        "ret_mgr_rva": "0x6378C78",
+        "vec_begin_off": "0x30",
+        "vec_end_off": "0x38",
+        "record_rwid_off": "0x00",
+        "record_date_off": "0x0C"
+      },
+      "pero_chain": {
+        "pero_pflc": "0x340",
+        "pero_pcti": "0x10",
+        "teao_tclu": "0x30",
+        "objo_duni": "0x0C",
+        "objo_duni_person": "0x284"
+      },
+      "other_contracts_chain": {
+        "potc_ptr_off": "0xD0",
+        "lnc_off_in_potc": "0x0",
+        "bclub_off_in_potc": "0x8",
+        "nation_off_in_potc": "0x10"
+      },
+      "b_club_contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x18",
+        "job_type": "0x1C",
+        "start": "0x3C",
+        "end": "0x40",
+        "agreed_playing_time": "0x4C",
+        "prev_playing_time": "0x4D",
+        "squad_num": "0x55"
+      },
+      "loan_contract_chain": {
+        "potc_ptr_off": "0xD0",
+        "lnc_off_in_potc": "0x0"
+      },
+      "loan_contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x18",
+        "start": "0x3C",
+        "end": "0x40",
+        "sign_date": "0x44",
+        "agreed_playing_time": "0x4C",
+        "squad_num": "0x55",
+        "flags": "0x98",
+        "buy_fee": "0xA8",
+        "buyback_fee": "0xB0",
+        "monthly_fee": "0xB4",
+        "monthly_fee_unused": "0xB8",
+        "weekly_wage_unused": "0xBC",
+        "purchase_after_matches": "0xDD"
+      },
+      "future_transfer_chain": {
+        "mgr_rva": "0x6374650",
+        "transfer_vec_begin_off": "0x20",
+        "transfer_vec_end_off": "0x28",
+        "node_vec_begin_off": "0x50",
+        "node_vec_end_off": "0x58",
+        "node_player_ptr_off": "0x40",
+        "node_date_off": "0x48",
+        "node_fto_index_off": "0x4C"
+      },
+      "future_transfer_offsets": {
+        "player_ptr": "0x30",
+        "dest_team_ptr": "0x38",
+        "src_team_ptr": "0x48",
+        "fee": "0x60",
+        "ttst": "0x7B"
+      },
+      "entity_offsets": {
+        "pfl1": "0x291",
+        "is_female_bit": 4,
+        "pfl2": "0x3DA",
+        "nation_ptr": "0x2E8",
+        "contract_ptr": "0x340",
+        "trait_blob": "0x368",
+        "joined_date": "0x3C4",
+        "moved_date": "0x3C8",
+        "injury_list": "0xF8",
+        "current_team_ptr": "0x130",
+        "guide_value": "0x1D0",
+        "transfer_value": "0x1D4"
+      },
+      "contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x18",
+        "job_type": "0x1C",
+        "start": "0x3C",
+        "end": "0x40",
+        "sign_date": "0x44",
+        "agreed_playing_time": "0x4C",
+        "transfer_flags": "0x4F",
+        "squad_num": "0x55",
+        "loyalty_bonus": "0x98",
+        "agent_fees": "0x9C",
+        "contract_type": "0xB3"
+      },
+      "agreed_playing_time_enum": {
+        "0": "Not Set",
+        "1": "Star Player",
+        "2": "Important Player",
+        "3": "Regular Starter",
+        "4": "Squad Player",
+        "5": "Impact Sub",
+        "6": "Squad Player",
+        "7": "Fringe Player",
+        "9": "Emergency Backup",
+        "10": "Breakthrough Prospect",
+        "11": "Future Prospect",
+        "12": "Hot Prospect",
+        "13": "Youngster",
+        "14": "B Team Regular",
+        "15": "First-Choice Goalkeeper",
+        "16": "Cup Goalkeeper",
+        "17": "Domestic Cup Goalkeeper",
+        "18": "Continental Cup Goalkeeper",
+        "19": "Cup Goalkeeper",
+        "20": "Backup Goalkeeper",
+        "21": "Emergency Backup Goalkeeper",
+        "22": "Surplus to Requirements"
+      },
+      "team_type_enum": {
+        "0": "First Team",
+        "1": "Reserves",
+        "2": "A Team",
+        "3": "B Team",
+        "4": "Superdraft A",
+        "5": "Superdraft B",
+        "6": "Superdraft C",
+        "7": "Superdraft D",
+        "8": "Waivers",
+        "9": "U23",
+        "10": "U21",
+        "11": "U19",
+        "12": "U18",
+        "13": "C Team",
+        "14": "Amateur",
+        "15": "II",
+        "16": "Team 2",
+        "17": "Team 3",
+        "18": "U20",
+        "22": "Youth Evaluation",
+        "30": "Dutch Reserves",
+        "33": "U22",
+        "36": "U19 B Team",
+        "37": "U18 B Team",
+        "38": "All",
+        "39": "All Youth",
+        "40": "Highest Youth",
+        "41": "Lowest Youth",
+        "42": "All Non-First",
+        "44": "Second XI"
+      },
+      "contract_type_enum": {
+        "1": "Full Time",
+        "2": "Amateur",
+        "3": "Youth",
+        "4": "Non-Contract",
+        "5": "Future Professional",
+        "7": "Reserve (USA)",
+        "9": "Designated Player (USA)",
+        "10": "Senior Minimum Salary (USA)",
+        "11": "Generation Adidas (USA)",
+        "13": "Designated Player",
+        "15": "Scholarship Player (Australia)",
+        "16": "Guest Player (Australia)",
+        "18": "Mature Age Rookie Player (Australia)",
+        "21": "NWSL Senior"
+      },
+      "injury_container_offsets": {
+        "inj_begin": "0x0",
+        "inj_end": "0x8",
+        "ban_begin": "0x18",
+        "ban_end": "0x20"
+      },
+      "name_nested": {
+        "full_name": "0x2C0",
+        "first_name": "0x2D0",
+        "last_name": "0x2D8",
+        "common_name": "0x2E0"
+      },
+      "positions_u8": {
+        "pos_gk": "0x208",
+        "pos_sw": "0x209",
+        "pos_dl": "0x20A",
+        "pos_dc": "0x20B",
+        "pos_dr": "0x20C",
+        "pos_dm": "0x20D",
+        "pos_ml": "0x20E",
+        "pos_mc": "0x20F",
+        "pos_mr": "0x210",
+        "pos_aml": "0x211",
+        "pos_amc": "0x212",
+        "pos_amr": "0x213",
+        "pos_st": "0x214",
+        "pos_wbl": "0x215",
+        "pos_wbr": "0x216"
+      },
+      "attrs_u8": {
+        "crossing": "0x217",
+        "dribbling": "0x218",
+        "finishing": "0x219",
+        "heading": "0x21A",
+        "long_shots": "0x21B",
+        "marking": "0x21C",
+        "off_the_ball": "0x21D",
+        "passing": "0x21E",
+        "penalty_taking": "0x21F",
+        "tackling": "0x220",
+        "vision": "0x221",
+        "handling": "0x222",
+        "aerial_reach": "0x223",
+        "command_of_area": "0x224",
+        "communication": "0x225",
+        "kicking": "0x226",
+        "throwing": "0x227",
+        "anticipation": "0x228",
+        "decisions": "0x229",
+        "one_on_ones": "0x22A",
+        "positioning": "0x22B",
+        "reflexes": "0x22C",
+        "first_touch": "0x22D",
+        "technique": "0x22E",
+        "left_foot": "0x22F",
+        "right_foot": "0x230",
+        "flair": "0x231",
+        "corners": "0x232",
+        "teamwork": "0x233",
+        "work_rate": "0x234",
+        "long_throws": "0x235",
+        "eccentricity": "0x236",
+        "rushing_out": "0x237",
+        "punching": "0x238",
+        "acceleration": "0x239",
+        "free_kicks": "0x23A",
+        "strength": "0x23B",
+        "stamina": "0x23C",
+        "pace": "0x23D",
+        "jumping_reach": "0x23E",
+        "leadership": "0x23F",
+        "dirtiness": "0x240",
+        "balance": "0x241",
+        "bravery": "0x242",
+        "consistency": "0x243",
+        "aggression": "0x244",
+        "agility": "0x245",
+        "important_matches": "0x246",
+        "injury_proneness": "0x247",
+        "versatility": "0x248",
+        "natural_fitness": "0x249",
+        "determination": "0x24A",
+        "composure": "0x24B",
+        "concentration": "0x24C"
+      },
+      "personality_u8": {
+        "adaptability": "0x2F0",
+        "ambition": "0x2F1",
+        "loyalty": "0x2F2",
+        "pressure": "0x2F3",
+        "professionalism": "0x2F4",
+        "sportsmanship": "0x2F5",
+        "temperament": "0x2F6",
+        "controversy": "0x2F7"
+      },
+      "stats_u8": {
+        "morale": "0x25F",
+        "nationality_info": "0x257"
+      },
+      "intl_stats_u8": {
+        "intl_apps": {
+          "ptrPerson_off": "0x164",
+          "entity_ptr_off_AP": "0x3DC"
+        },
+        "u21_apps": {
+          "ptrPerson_off": "0x165",
+          "entity_ptr_off_AP": "0x3DD"
+        },
+        "intl_goals": {
+          "ptrPerson_off": "0x166",
+          "entity_ptr_off_AP": "0x3DE"
+        },
+        "u21_goals": {
+          "ptrPerson_off": "0x167",
+          "entity_ptr_off_AP": "0x3DF"
+        }
+      },
+      "appearance_u8": {
+        "ethnicity": "0x309",
+        "hair_colour": "0x30A",
+        "hair_length": "0x30B",
+        "skin_tone": "0x30C"
+      },
+      "job_pref": {
+        "bitmask_ptrPerson_off": "0x100"
+      },
+      "stats_u16": {
+        "ca": "0x200",
+        "pa": "0x202",
+        "sharpness": "0x1F4",
+        "fatigue": "0x1F6",
+        "fitness": "0x1F8",
+        "home_rep": "0x1FA",
+        "cur_rep": "0x1FC",
+        "world_rep": "0x1FE",
+        "height": "0x14E",
+        "weight": "0x14C"
+      },
+      "season_stats": {
+        "comp_lookup_offset": "0x100",
+        "season_container_offset": "0x108",
+        "season_container_ptr_array_off": "0x20",
+        "season_container_blk_stride": 8,
+        "career_stats_offset": "0x110",
+        "comp_lookup_table": {
+          "table_off_in_rdi": "0x08",
+          "entry_size": 8,
+          "struct_base_stride": 120
+        },
+        "lvl1_fields": {
+          "struct_base_ptr": {
+            "offset": "0x00",
+            "type": "u64",
+            "stat": "ptr to 120-byte stat block (struct_base)"
+          },
+          "rating_sum_x10": {
+            "offset": "0x08",
+            "type": "u16",
+            "stat": "sum of match ratings x10; avg = value / 10 / apps"
+          },
+          "minutes": {
+            "offset": "0x0A",
+            "type": "u16",
+            "stat": "total season minutes"
+          },
+          "starts_and_subs": {
+            "offset": "0x0C",
+            "type": "u16_packed",
+            "lo": "starts",
+            "hi": "sub_appearances"
+          },
+          "goals_and_apps": {
+            "offset": "0x0E",
+            "type": "u16_packed",
+            "lo": "completed_appearances",
+            "hi": "goals"
+          },
+          "gconceded_assists": {
+            "offset": "0x10",
+            "type": "u16_packed",
+            "lo": "assists",
+            "hi": "goals_conceded (GK only; outfield=0)"
+          },
+          "pen_scored_taken": {
+            "offset": "0x12",
+            "type": "u16_packed",
+            "lo": "penalties_taken",
+            "hi": "penalties_scored"
+          },
+          "rc_and_pom": {
+            "offset": "0x14",
+            "type": "u16_packed",
+            "lo": "player_of_match",
+            "hi": "red_cards"
+          },
+          "cleansheets_yc": {
+            "offset": "0x16",
+            "type": "u16_packed",
+            "lo": "yellow_cards",
+            "hi": "clean_sheets (GK only; outfield=0)"
+          },
+          "unknown_0x18": {
+            "offset": "0x18",
+            "type": "u16",
+            "stat": "unknown (~44-51; possibly team total games)"
+          }
+        },
+        "struct_base_fields": {
+          "team_goals": {
+            "offset": "0x00"
+          },
+          "team_goals_conceded": {
+            "offset": "0x02"
+          },
+          "games_won": {
+            "offset": "0x04"
+          },
+          "games_lost": {
+            "offset": "0x06"
+          },
+          "passes_attempted": {
+            "offset": "0x08"
+          },
+          "passes_completed": {
+            "offset": "0x0A"
+          },
+          "tackles_attempted": {
+            "offset": "0x0C"
+          },
+          "tackles_completed": {
+            "offset": "0x0E"
+          },
+          "headers_attempted": {
+            "offset": "0x10"
+          },
+          "headers_won": {
+            "offset": "0x12"
+          },
+          "dribbles": {
+            "offset": "0x14"
+          },
+          "fouls_made": {
+            "offset": "0x16"
+          },
+          "fouls_against": {
+            "offset": "0x18"
+          },
+          "shots": {
+            "offset": "0x1A"
+          },
+          "shots_on_target": {
+            "offset": "0x1C"
+          },
+          "unknown_0x1E": {
+            "offset": "0x1E"
+          },
+          "unknown_0x20": {
+            "offset": "0x20"
+          },
+          "unknown_0x22": {
+            "offset": "0x22"
+          },
+          "unknown_0x24": {
+            "offset": "0x24"
+          },
+          "mistakes_leading_to_goals": {
+            "offset": "0x28"
+          },
+          "minutes_since_last_goal": {
+            "offset": "0x2A"
+          },
+          "minutes_since_last_conceded": {
+            "offset": "0x2C"
+          },
+          "distance_x10": {
+            "offset": "0x2E"
+          },
+          "offsides": {
+            "offset": "0x30"
+          },
+          "opc_attempted_or_saves_tipped": {
+            "offset": "0x32"
+          },
+          "open_play_crosses_completed": {
+            "offset": "0x34"
+          },
+          "key_passes": {
+            "offset": "0x36"
+          },
+          "key_tackles": {
+            "offset": "0x38"
+          },
+          "key_headers": {
+            "offset": "0x3A"
+          },
+          "interceptions": {
+            "offset": "0x3C"
+          },
+          "clear_cut_chances_created": {
+            "offset": "0x3E"
+          },
+          "blocks": {
+            "offset": "0x40"
+          },
+          "hat_tricks": {
+            "offset": "0x42"
+          },
+          "possession_lost": {
+            "offset": "0x44"
+          },
+          "possession_won": {
+            "offset": "0x46"
+          },
+          "xg_x100": {
+            "offset": "0x48"
+          },
+          "xa_x100": {
+            "offset": "0x4A"
+          },
+          "clearances": {
+            "offset": "0x4C"
+          },
+          "free_kick_shots": {
+            "offset": "0x50"
+          },
+          "goals_from_outside_box": {
+            "offset": "0x52"
+          },
+          "unknown_0x54": {
+            "offset": "0x54"
+          },
+          "unknown_0x56": {
+            "offset": "0x56"
+          },
+          "unknown_0x58": {
+            "offset": "0x58"
+          },
+          "open_play_crosses_attempted": {
+            "offset": "0x5A"
+          },
+          "shots_from_outside_box": {
+            "offset": "0x5C"
+          },
+          "expected_goals_prevented_x100": {
+            "offset": "0x5E"
+          },
+          "sprints": {
+            "offset": "0x60"
+          },
+          "progressive_passes": {
+            "offset": "0x64"
+          },
+          "pressures_attempted": {
+            "offset": "0x66"
+          },
+          "pressures_completed": {
+            "offset": "0x68"
+          },
+          "open_play_key_passes": {
+            "offset": "0x6A"
+          },
+          "npxg_x100": {
+            "offset": "0x6C"
+          },
+          "xg_overperformance_x100": {
+            "offset": "0x6E"
+          },
+          "crosses_attempted": {
+            "offset": "0x70"
+          },
+          "crosses_completed": {
+            "offset": "0x72"
+          },
+          "shots_blocked": {
+            "offset": "0x74"
+          },
+          "headers_lost": {
+            "offset": "0x76"
+          }
+        },
+        "career_stats": {
+          "ptr_offset": "0x110",
+          "fields": {
+            "all_time_league_goals": {
+              "index": 3
+            },
+            "all_time_goals": {
+              "index": 4
+            },
+            "all_time_appearances": {
+              "index": 5
+            },
+            "all_time_league_appearances": {
+              "index": 7
+            }
+          }
+        }
+      },
+      "trait_map": {
+        "0,0": "runs_with_ball_down_left",
+        "0,1": "runs_with_ball_down_right",
+        "0,2": "runs_with_ball_down_center",
+        "0,3": "gets_into_opposition_area",
+        "0,4": "moves_into_channels",
+        "0,5": "gets_forward_whenever_possible",
+        "0,6": "plays_short_simple_passes",
+        "0,7": "tries_killer_balls_often",
+        "1,0": "shoots_from_distance",
+        "1,1": "shoots_with_power",
+        "1,2": "places_shots",
+        "1,3": "curls_ball",
+        "1,4": "likes_to_round_keeper",
+        "1,5": "likes_to_break_offside_trap",
+        "1,6": "uses_outside_of_foot",
+        "1,7": "marks_opponent_tightly",
+        "2,0": "winds_up_opponents",
+        "2,1": "argues_with_officials",
+        "2,2": "plays_with_back_to_goal",
+        "2,3": "comes_deep_to_get_ball",
+        "2,4": "plays_one_twos",
+        "2,5": "likes_to_lob_keeper",
+        "2,6": "dictates_tempo",
+        "2,7": "attempts_overhead_kicks",
+        "3,0": "looks_for_pass_rather_than_scoring",
+        "3,1": "plays_no_through_balls",
+        "3,2": "stops_play",
+        "3,3": "knocks_ball_past_opponent",
+        "3,4": "moves_ball_to_right_foot_before_dribble",
+        "3,5": "moves_ball_to_left_foot_before_dribble",
+        "3,6": "dwells_on_ball",
+        "3,7": "arrives_late_in_opponents_area",
+        "4,0": "tries_to_play_way_out_of_trouble",
+        "4,1": "stays_back_at_all_times",
+        "4,2": "avoids_using_weaker_foot",
+        "4,3": "tries_tricks",
+        "4,4": "tries_long_range_free_kicks",
+        "4,5": "dives_into_tackles",
+        "4,6": "does_not_dive_into_tackles",
+        "4,7": "cuts_inside_from_both_wings",
+        "5,0": "hugs_line",
+        "5,1": "gets_crowd_going",
+        "5,2": "tries_first_time_shots",
+        "5,3": "tries_long_range_passes",
+        "5,4": "likes_ball_played_into_feet",
+        "5,5": "hits_free_kick_with_power",
+        "5,6": "likes_to_beat_man_repeatedly",
+        "5,7": "likes_to_switch_ball_to_other_flank",
+        "6,2": "possesses_long_flat_throw",
+        "6,3": "runs_with_ball_often",
+        "6,4": "runs_with_ball_rarely",
+        "6,6": "does_not_move_into_channels",
+        "6,7": "uses_long_throw_to_start_counter_attacks",
+        "7,0": "refrains_from_taking_long_shots",
+        "7,1": "cuts_inside_from_left_wing",
+        "7,2": "cuts_inside_from_right_wing",
+        "7,3": "crosses_early",
+        "7,4": "brings_ball_out_of_defense",
+        "7,7": "plays_ball_with_feet"
+      }
+    },
+    {
+      "fm_version": "26.3.1+2314564",
+      "person_base": "0x288",
+      "birth_date_offset": "0x310",
+      "regen_uid_threshold": 2002068000,
+      "chain": {
+        "chain_offset_1": "0x04E33E20",
+        "chain_offset_2": "0x04E33F60"
+      },
+      "savegame_id_chain": {
+        "savegame_id_rva": "0x04E33F60",
+        "alt_rva": "0x04E42950",
+        "field_off": "0xB8",
+        "session_nonce_off": "0xBC"
+      },
+      "save_name": {
+        "module": "game_plugin.dll",
+        "owners": [
+          {
+            "rtti": ".?AVSAVE_SYSTEM@@",
+            "name_off": "0x20"
+          },
+          {
+            "rtti": ".?AVGAME_GAME_DATABASE_RECORD@@",
+            "name_off": "0x8"
+          }
+        ]
+      },
+      "game_date_chain": {
+        "game_date_rva": "0x4DF1C18"
+      },
+      "person_table_chain": {
+        "person_root_rva": "0x4E475E0",
+        "container_off": "0x80",
+        "anchor_uid": 352
+      },
+      "human_manager_chain": {
+        "mgr_hnp_rva": "0x4E340F8",
+        "hmgr_start_off": "0x18",
+        "hmgr_end_off": "0x20",
+        "human_manager_offset": "0x450"
+      },
+      "human_manager_rtti": ".?AVHUMAN_NON_PLAYER@db@@",
+      "nplo_offsets": {
+        "apanp_staff_off": "0x280",
+        "home_rep": "0xD4",
+        "cur_rep": "0xD6",
+        "world_rep": "0xD8",
+        "ca": "0xDA",
+        "pa": "0xDC",
+        "tendencies_ptr": "0xA8",
+        "scouting_knowledge_ptr": "0xB0",
+        "coaching_style": "0xE9",
+        "preferred_formation": "0xDF",
+        "second_formation": "0xE0",
+        "defensive_formation": "0xE1",
+        "attacking_formation": "0xE2",
+        "attrs_base": "0x10",
+        "coaching_license_from_person": "0x13C"
+      },
+      "staff_attrs_u8": {
+        "tactical_attacking": "0x10",
+        "chairman_business": "0x11",
+        "tactical_depth_technique": "0x12",
+        "tactical_directness": "0x13",
+        "mental_authority": "0x14",
+        "tactical_free_roles": "0x15",
+        "chairman_interference": "0x16",
+        "tactical_marking": "0x17",
+        "tactical_offside": "0x18",
+        "chairman_patience": "0x19",
+        "tactical_pressing_intensity": "0x1A",
+        "chairman_resources": "0x1B",
+        "coaching_working_with_youngsters": "0x1C",
+        "tactical_fluidity": "0x24",
+        "tactical_flexibility": "0x25",
+        "non_tactical_buying_players": "0x1E",
+        "non_tactical_mind_games": "0x1F",
+        "tactical_sitting_back": "0x20",
+        "tactical_use_of_playmaker": "0x21",
+        "tactical_use_of_substitutions": "0x22",
+        "tactical_defensive_line": "0x23",
+        "non_tactical_hardness_of_training": "0x26",
+        "non_tactical_squad_rotation": "0x27",
+        "tactical_tempo": "0x28",
+        "tactical_width": "0x29"
+      },
+      "staff_attrs_fm": {
+        "mental_determination": "0x1D",
+        "coaching_goalkeeping": "0x2B",
+        "judging_player_ability": "0x2C",
+        "judging_player_potential": "0x2D",
+        "people_management": "0x2E",
+        "motivating": "0x2F",
+        "physiotherapy": "0x30",
+        "tactical_knowledge": "0x31",
+        "coaching_attacking": "0x32",
+        "coaching_defending": "0x33",
+        "coaching_fitness": "0x34",
+        "coaching_possession": "0x35",
+        "coaching_technical": "0x36",
+        "coaching_tactical": "0x37",
+        "tactical_dirtiness_allowance": "0x38",
+        "non_tactical_versatility": "0x3B",
+        "analysing_data": "0x3C",
+        "sports_science": "0x3F",
+        "tactical_eccentricity": "0x40",
+        "negotiating": "0x41",
+        "judging_staff_ability": "0x42",
+        "coaching_set_pieces": "0x43"
+      },
+      "mano_offsets": {
+        "mcha": "0x43C",
+        "scouting_centre_ptr": "0x370",
+        "ppro": "0x110",
+        "pfl1": "0x404",
+        "pfl2": "0x405"
+      },
+      "mano_characteristics": {
+        "managing_finances": "0x0",
+        "handling_team_discipline": "0x1",
+        "loyalty_to_players": "0x2",
+        "tactical_consistency": "0x3",
+        "domestic_player_bias": "0x4",
+        "hands_on_approach": "0x5",
+        "media_handling": "0x6"
+      },
+      "mano_scouting_offsets": {
+        "budget_season": "0xDF0",
+        "budget_available": "0xDF4",
+        "recruitment_package": "0xDFC"
+      },
+      "currency_table_chain": {
+        "currency_root_rva": "0x4E475A8",
+        "container_off": "0x80"
+      },
+      "currency_record_offsets": {
+        "uid": "0x0C",
+        "full_name": "0x18",
+        "short_name": "0x20",
+        "symbol": "0x30",
+        "exchange_rate": "0x38"
+      },
+      "club_table_chain": {
+        "club_root_rva": "0x4E47588",
+        "container_off": "0x80"
+      },
+      "team_table_chain": {
+        "team_root_rva": "0x4E47610",
+        "container_off": "0x80"
+      },
+      "comp_table_chain": {
+        "comp_root_rva": "0x4E47590",
+        "container_off": "0x80"
+      },
+      "rtti_player_types": [
+        ".?AVACTUAL_PLAYER@db@@",
+        ".?AVACTUAL_PLAYER_AND_NON_PLAYER@db@@"
+      ],
+      "rtti_club_types": [
+        ".?AVCLUB@db@@"
+      ],
+      "rtti_team_types": [
+        ".?AVTEAM@db@@"
+      ],
+      "rtti_comp_types": [
+        ".?AVCOMP@db@@"
+      ],
+      "vtable_rvas": {
+        "vtb_club": "0xF0D2B0",
+        "vtb_team": "0xFFC8B0",
+        "vtb_comp": "0xFA73C0"
+      },
+      "club_offsets": {
+        "uid": "0x0C",
+        "status": "0x16A",
+        "name_full": "0xC0",
+        "name_short": "0xC8",
+        "nation_ptr": "0xD8",
+        "first_team_container": "0x18",
+        "cino_ptr": "0xB0",
+        "cint_ptr": "0x100",
+        "fin_ptr": "0x150"
+      },
+      "club_cino_offsets": {
+        "avg_attendance": "0x68",
+        "min_attendance": "0x6C",
+        "max_attendance": "0x70",
+        "pref_formation": "0x74",
+        "nickname": "0x90",
+        "fg_color": "0xA0",
+        "bg_color": "0xA8"
+      },
+      "club_cint_offsets": {
+        "six_letter_name": "0x00",
+        "season_ticket_holders": "0xB8",
+        "year_founded": "0xD0",
+        "chairman_status": "0xD6",
+        "social_media_followers": "0xF0",
+        "social_stature": "0xF4",
+        "social_trendiness": "0xF6",
+        "supporter_loyalty": "0x10C",
+        "supporter_passion": "0x10D",
+        "supporter_patience": "0x10E",
+        "supporter_affluence": "0x10F",
+        "supporter_temperament": "0x110",
+        "supporter_expectations": "0x111",
+        "training_facilities": "0x118",
+        "morale": "0x119",
+        "youth_importance": "0x11E",
+        "ownership_type": "0x121",
+        "chairman_title": "0x122",
+        "youth_facilities": "0x123",
+        "youth_coaching": "0x124",
+        "youth_recruitment": "0x125"
+      },
+      "ownership_type_enum": {
+        "1": "Limited Liability Company",
+        "2": "Public Limited Company",
+        "3": "Member Owned (Elections)",
+        "4": "Member Owned (No Elections)",
+        "5": "Consortium Private Limited",
+        "6": "Consortium Public Limited"
+      },
+      "club_fin_offsets": {
+        "balance": "0x14",
+        "transfer_budget_current": "0x7CC",
+        "transfer_budget_season": "0x7D0",
+        "transfer_revenue_pct": "0x7D8",
+        "wage_budget": "0x810",
+        "max_wage_allowed": "0x814",
+        "wage_total": "0x818",
+        "wage_total_with_bonus": "0x81C",
+        "corporate_facilities": "0x8B5"
+      },
+      "comp_offsets": {
+        "uid": "0x0C",
+        "name_full": "0x40",
+        "name_short": "0x48",
+        "name_3letter": "0x50",
+        "continent_ptr": "0x58",
+        "nation_ptr": "0x60",
+        "cacm_ptr": "0xB0",
+        "clubs_foreign_eligible": "0x120",
+        "clubs_bottom_div": "0x124",
+        "clubs_total": "0x128",
+        "clubs_wildcard": "0x14C",
+        "pitch_min_length_dm": "0x15C",
+        "pitch_min_width_dm": "0x15E",
+        "pitch_max_length_dm": "0x160",
+        "pitch_max_width_dm": "0x162",
+        "div_position": "0x17E",
+        "reputation": "0x188",
+        "original_rep": "0x18A",
+        "squad_status_threshold": "0x198",
+        "level": "0x199",
+        "comp_type": "0x19C",
+        "league_or_cup": "0x19E",
+        "flags": "0x1A0",
+        "db_type_active": "0xF4",
+        "comp_category": "0xF8",
+        "is_female": "0xF9"
+      },
+      "comp_category_enum": {
+        "0": "Domestic Top Division",
+        "1": "Domestic Division",
+        "2": "Domestic Main Cup",
+        "3": "Domestic League Cup",
+        "4": "Domestic Cup",
+        "5": "Super Cup",
+        "6": "International Finals",
+        "7": "International Qualifiers",
+        "8": "Reserve Division",
+        "9": "Club Friendly",
+        "10": "Main Continental International Finals",
+        "11": "Main Continental International Qualifiers",
+        "12": "Club Finals",
+        "13": "Friendly",
+        "14": "Domestic Other Division",
+        "15": "U21 International Finals",
+        "16": "U21 International Qualifiers",
+        "17": "U19 International Finals",
+        "18": "U19 International Qualifiers",
+        "19": "U23 International Finals",
+        "20": "U23 International Qualifiers",
+        "21": "Club Champions Cup",
+        "22": "Cup Winners Cup",
+        "23": "Reserve Cup",
+        "24": "International Friendly",
+        "25": "U20 International Finals",
+        "26": "All Stars Cup",
+        "27": "U20 International Qualifiers",
+        "28": "Inactive Competition",
+        "29": "Inactive Other Competition",
+        "31": "U22 International Finals",
+        "32": "U22 International Qualifiers",
+        "33": "U23 Division",
+        "34": "U22 Division",
+        "35": "U21 Division",
+        "36": "U20 Division",
+        "37": "U19 Division",
+        "38": "U18 Division",
+        "39": "Youth Cup"
+      },
+      "nation_offsets": {
+        "nation_name_ptr": "0x18",
+        "short_name_ptr": "0x20",
+        "abbrev_3letter_ptr": "0x28",
+        "name_blob_ptr": "0x30"
+      },
+      "cono_offsets": {
+        "name": "0x18"
+      },
+      "comp_league_chain": {
+        "cacm_off": "0xB0",
+        "clge_off_in_cacm": "0x1C0"
+      },
+      "team_offsets": {
+        "uid": "0x0C",
+        "team_type": "0x28",
+        "min_age": "0x2C",
+        "max_age": "0x2D",
+        "club_ptr": "0x30",
+        "player_roster_begin": "0x38",
+        "comp_ptr": "0x50",
+        "next_comp_ptr": "0x58",
+        "stadium_ptr": "0x78",
+        "manager_ptr": "0x80",
+        "reputation": "0xA8"
+      },
+      "stadium_offsets": {
+        "name_blob_ptr": "0x40"
+      },
+      "retirement_table_chain": {
+        "ret_mgr_rva": "0x4E38CE0",
+        "vec_begin_off": "0x30",
+        "vec_end_off": "0x38",
+        "record_rwid_off": "0x00",
+        "record_date_off": "0x0C"
+      },
+      "pero_chain": {
+        "pero_pflc": "0x330",
+        "pero_pcti": "0x10",
+        "teao_tclu": "0x30",
+        "objo_duni": "0x0C",
+        "objo_duni_person": "0x294"
+      },
+      "loan_contract_chain": {
+        "potc_ptr_off": "0xB0",
+        "lnc_off_in_potc": "0x0"
+      },
+      "loan_contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x20",
+        "start": "0x44",
+        "end": "0x48",
+        "sign_date": "0x4C",
+        "agreed_playing_time": "0x54",
+        "squad_num": "0x5D",
+        "flags": "0xA0",
+        "buy_fee": "0xB0",
+        "monthly_fee": "0xBC",
+        "agreed_squad_num": "0xE8",
+        "purchase_after_matches": "0xEF"
+      },
+      "other_contracts_chain": {
+        "potc_ptr_off": "0xB0",
+        "lnc_off_in_potc": "0x0",
+        "bclub_off_in_potc": "0x8",
+        "nation_off_in_potc": "0x10"
+      },
+      "b_club_contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x20",
+        "job_type": "0x26",
+        "start": "0x44",
+        "end": "0x48",
+        "agreed_playing_time": "0x54",
+        "squad_num": "0x5D"
+      },
+      "future_transfer_chain": {
+        "mgr_rva": "0x4E33E20",
+        "transfer_vec_begin_off": "0x20",
+        "transfer_vec_end_off": "0x28",
+        "ptrn_off_from_person": "0x98",
+        "ptrn_idx_begin_off": "0x00",
+        "ptrn_idx_end_off": "0x08"
+      },
+      "future_transfer_offsets": {
+        "flags": "0x30",
+        "ttst": "0x8D",
+        "player_ptr": "0x38",
+        "dest_team_ptr": "0x40",
+        "src_team_ptr": "0x50",
+        "fee": "0x58",
+        "date_offer": "0x74",
+        "date_2": "0x78",
+        "date_effective": "0x7C"
+      },
+      "entity_offsets": {
+        "pfl1": "0x2A1",
+        "is_female_bit": 4,
+        "pfl2": "0x3BA",
+        "nation_ptr": "0x2F0",
+        "contract_ptr": "0x330",
+        "trait_blob": "0x348",
+        "joined_date": "0x3A4",
+        "moved_date": "0x3A8",
+        "injury_list": "0xF8",
+        "current_team_ptr": "0x130",
+        "guide_value": "0x234",
+        "transfer_value": "0x238"
+      },
+      "contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x20",
+        "job_type": "0x26",
+        "start": "0x44",
+        "end": "0x48",
+        "sign_date": "0x4C",
+        "agreed_playing_time": "0x54",
+        "transfer_flags": "0x57",
+        "squad_num": "0x5D",
+        "loyalty_bonus": "0xA8",
+        "agent_fees": "0xAC",
+        "contract_type": "0xC3"
+      },
+      "agreed_playing_time_enum": {
+        "1": "Star Player",
+        "2": "Important Player",
+        "3": "Regular Starter",
+        "4": "Squad Player",
+        "5": "Impact Sub",
+        "7": "Fringe Player",
+        "9": "Emergency Backup",
+        "10": "Breakthrough Prospect",
+        "11": "Future Prospect",
+        "13": "Youngster",
+        "14": "Not Available",
+        "15": "First-Choice Goalkeeper",
+        "16": "Cup Goalkeeper",
+        "17": "Domestic Cup Goalkeeper",
+        "18": "Continental Cup Goalkeeper",
+        "20": "Backup",
+        "21": "Emergency Backup",
+        "22": "Surplus to Requirements"
+      },
+      "team_type_enum": {
+        "0": "First Team",
+        "1": "Reserves",
+        "2": "A Team",
+        "3": "B Team",
+        "4": "Superdraft A",
+        "5": "Superdraft B",
+        "6": "Superdraft C",
+        "7": "Superdraft D",
+        "8": "Waivers",
+        "9": "U23",
+        "10": "U21",
+        "11": "U19",
+        "12": "U18",
+        "13": "C Team",
+        "14": "Amateur",
+        "15": "II",
+        "16": "Team 2",
+        "17": "Team 3",
+        "18": "U20",
+        "22": "Youth Evaluation",
+        "30": "Dutch Reserves",
+        "33": "U22",
+        "36": "U19 B Team",
+        "37": "U18 B Team",
+        "38": "All",
+        "39": "All Youth",
+        "40": "Highest Youth",
+        "41": "Lowest Youth",
+        "42": "All Non-First",
+        "44": "Second XI"
+      },
+      "contract_type_enum": {
+        "1": "Full Time",
+        "2": "Amateur",
+        "3": "Youth",
+        "4": "Non-Contract",
+        "5": "Future Professional",
+        "7": "Reserve (USA)",
+        "9": "Designated Player (USA)",
+        "10": "Senior Minimum Salary (USA)",
+        "11": "Generation Adidas (USA)",
+        "13": "Designated Player",
+        "15": "Scholarship Player (Australia)",
+        "16": "Guest Player (Australia)",
+        "18": "Mature Age Rookie Player (Australia)",
+        "21": "NWSL Senior"
+      },
+      "injury_container_offsets": {
+        "inj_begin": "0x0",
+        "inj_end": "0x8",
+        "ban_begin": "0x18",
+        "ban_end": "0x20"
+      },
+      "name_inline": {
+        "full_name": "0x2C8"
+      },
+      "name_nested": {
+        "first_name": "0x2D8",
+        "last_name": "0x2E0",
+        "common_name": "0x2E8"
+      },
+      "positions_u8": {
+        "pos_gk": "0x150",
+        "pos_sw": "0x151",
+        "pos_dl": "0x152",
+        "pos_dc": "0x153",
+        "pos_dr": "0x154",
+        "pos_dm": "0x155",
+        "pos_ml": "0x156",
+        "pos_mc": "0x157",
+        "pos_mr": "0x158",
+        "pos_aml": "0x159",
+        "pos_amc": "0x15A",
+        "pos_amr": "0x15B",
+        "pos_st": "0x15C",
+        "pos_wbl": "0x15D",
+        "pos_wbr": "0x15E"
+      },
+      "attrs_u8": {
+        "crossing": "0x15F",
+        "dribbling": "0x160",
+        "finishing": "0x161",
+        "heading": "0x162",
+        "long_shots": "0x163",
+        "marking": "0x164",
+        "off_the_ball": "0x165",
+        "passing": "0x166",
+        "penalty_taking": "0x167",
+        "tackling": "0x168",
+        "vision": "0x169",
+        "handling": "0x16A",
+        "aerial_reach": "0x16B",
+        "command_of_area": "0x16C",
+        "communication": "0x16D",
+        "kicking": "0x16E",
+        "throwing": "0x16F",
+        "anticipation": "0x170",
+        "decisions": "0x171",
+        "one_on_ones": "0x172",
+        "positioning": "0x173",
+        "reflexes": "0x174",
+        "first_touch": "0x175",
+        "technique": "0x176",
+        "left_foot": "0x177",
+        "right_foot": "0x178",
+        "flair": "0x179",
+        "corners": "0x17A",
+        "teamwork": "0x17B",
+        "work_rate": "0x17C",
+        "long_throws": "0x17D",
+        "eccentricity": "0x17E",
+        "rushing_out": "0x17F",
+        "punching": "0x180",
+        "acceleration": "0x181",
+        "free_kicks": "0x182",
+        "strength": "0x183",
+        "stamina": "0x184",
+        "pace": "0x185",
+        "jumping_reach": "0x186",
+        "leadership": "0x187",
+        "dirtiness": "0x188",
+        "balance": "0x189",
+        "bravery": "0x18A",
+        "consistency": "0x18B",
+        "aggression": "0x18C",
+        "agility": "0x18D",
+        "important_matches": "0x18E",
+        "injury_proneness": "0x18F",
+        "versatility": "0x190",
+        "natural_fitness": "0x191",
+        "determination": "0x192",
+        "composure": "0x193",
+        "concentration": "0x194"
+      },
+      "personality_u8": {
+        "adaptability": "0x2F8",
+        "ambition": "0x2F9",
+        "loyalty": "0x2FA",
+        "pressure": "0x2FB",
+        "professionalism": "0x2FC",
+        "sportsmanship": "0x2FD",
+        "temperament": "0x2FE",
+        "controversy": "0x2FF"
+      },
+      "stats_u8": {
+        "morale": "0x26C",
+        "height": "0x22E",
+        "u21_apps": "0x3C0",
+        "u21_goals": "0x3C1",
+        "nationality_info": "0x26E"
+      },
+      "appearance_u8": {
+        "ethnicity": "0x315",
+        "hair_colour": "0x316",
+        "hair_length": "0x317",
+        "skin_tone": "0x318"
+      },
+      "job_pref_u8": {
+        "manager": "0x358",
+        "assistant_manager": "0x359",
+        "coach": "0x35A",
+        "physio": "0x35B",
+        "scout": "0x35C",
+        "goalkeeping_coach": "0x35D",
+        "fitness_coach": "0x35E",
+        "set_piece_coach": "0x35F",
+        "chairman": "0x360",
+        "director_of_football": "0x361",
+        "head_of_youth_dev": "0x362",
+        "loan_manager": "0x363",
+        "data_analyst": "0x364",
+        "sports_scientist": "0x365",
+        "technical_director": "0x366"
+      },
+      "stats_u16": {
+        "ca": "0x264",
+        "pa": "0x266",
+        "sharpness": "0x258",
+        "fatigue": "0x25A",
+        "fitness": "0x25C",
+        "home_rep": "0x25E",
+        "cur_rep": "0x260",
+        "world_rep": "0x262",
+        "intl_apps": "0x3BC",
+        "intl_goals": "0x3BE"
+      },
+      "season_stats": {
+        "rdi_offset": "0x108",
+        "lvl1_slot_offset": "0x48",
+        "lvl1_fields": {
+          "struct_base_ptr": {
+            "offset": "0x00",
+            "type": "u64",
+            "stat": "ptr to 120-byte stat block"
+          },
+          "rating_sum_x10": {
+            "offset": "0x08",
+            "type": "u16",
+            "stat": "sum of match ratings \u00d710; avg = value / 10 / apps"
+          },
+          "minutes": {
+            "offset": "0x0A",
+            "type": "u16",
+            "stat": "total season minutes"
+          },
+          "starts_and_subs": {
+            "offset": "0x0C",
+            "type": "u16_packed",
+            "lo": "starts",
+            "hi": "sub_appearances"
+          },
+          "goals_and_apps": {
+            "offset": "0x0E",
+            "type": "u16_packed",
+            "lo": "completed_appearances",
+            "hi": "goals"
+          },
+          "gconceded_assists": {
+            "offset": "0x10",
+            "type": "u16_packed",
+            "lo": "assists",
+            "hi": "goals_conceded (GK only; outfield=0)"
+          },
+          "pen_scored_taken": {
+            "offset": "0x12",
+            "type": "u16_packed",
+            "lo": "penalties_taken",
+            "hi": "penalties_scored"
+          },
+          "rc_and_pom": {
+            "offset": "0x14",
+            "type": "u16_packed",
+            "lo": "player_of_match",
+            "hi": "red_cards"
+          },
+          "cleansheets_yc": {
+            "offset": "0x16",
+            "type": "u16_packed",
+            "lo": "yellow_cards",
+            "hi": "clean_sheets (GK only; outfield=0)"
+          },
+          "unknown_0x18": {
+            "offset": "0x18",
+            "type": "u16",
+            "stat": "unknown (~44-51; possibly team total games)"
+          }
+        },
+        "struct_base_fields": {
+          "team_goals": {
+            "offset": "0x00"
+          },
+          "team_goals_conceded": {
+            "offset": "0x02"
+          },
+          "games_won": {
+            "offset": "0x04"
+          },
+          "games_lost": {
+            "offset": "0x06"
+          },
+          "passes_attempted": {
+            "offset": "0x08"
+          },
+          "passes_completed": {
+            "offset": "0x0A"
+          },
+          "tackles_attempted": {
+            "offset": "0x0C"
+          },
+          "tackles_completed": {
+            "offset": "0x0E"
+          },
+          "headers_attempted": {
+            "offset": "0x10"
+          },
+          "headers_won": {
+            "offset": "0x12"
+          },
+          "dribbles": {
+            "offset": "0x14"
+          },
+          "fouls_made": {
+            "offset": "0x16"
+          },
+          "fouls_against": {
+            "offset": "0x18"
+          },
+          "shots": {
+            "offset": "0x1A"
+          },
+          "shots_on_target": {
+            "offset": "0x1C"
+          },
+          "unknown_0x1E": {
+            "offset": "0x1E"
+          },
+          "unknown_0x20": {
+            "offset": "0x20"
+          },
+          "unknown_0x22": {
+            "offset": "0x22"
+          },
+          "unknown_0x24": {
+            "offset": "0x24"
+          },
+          "mistakes_leading_to_goals": {
+            "offset": "0x28"
+          },
+          "minutes_since_last_goal": {
+            "offset": "0x2A"
+          },
+          "minutes_since_last_conceded": {
+            "offset": "0x2C"
+          },
+          "distance_x10": {
+            "offset": "0x2E"
+          },
+          "offsides": {
+            "offset": "0x30"
+          },
+          "opc_attempted_or_saves_tipped": {
+            "offset": "0x32"
+          },
+          "open_play_crosses_completed": {
+            "offset": "0x34"
+          },
+          "key_passes": {
+            "offset": "0x36"
+          },
+          "key_tackles": {
+            "offset": "0x38"
+          },
+          "unknown_0x3A": {
+            "offset": "0x3A"
+          },
+          "interceptions": {
+            "offset": "0x3C"
+          },
+          "clear_cut_chances_created": {
+            "offset": "0x3E"
+          },
+          "blocks": {
+            "offset": "0x40"
+          },
+          "possession_lost": {
+            "offset": "0x44"
+          },
+          "possession_won": {
+            "offset": "0x46"
+          },
+          "xg_x100": {
+            "offset": "0x48"
+          },
+          "xa_x100": {
+            "offset": "0x4A"
+          },
+          "clearances": {
+            "offset": "0x4C"
+          },
+          "free_kick_shots": {
+            "offset": "0x50"
+          },
+          "goals_from_outside_box": {
+            "offset": "0x52"
+          },
+          "unknown_0x54": {
+            "offset": "0x54"
+          },
+          "unknown_0x56": {
+            "offset": "0x56"
+          },
+          "unknown_0x58": {
+            "offset": "0x58"
+          },
+          "open_play_crosses_attempted": {
+            "offset": "0x5A"
+          },
+          "shots_from_outside_box": {
+            "offset": "0x5C"
+          },
+          "expected_goals_prevented_x100": {
+            "offset": "0x5E"
+          },
+          "sprints": {
+            "offset": "0x60"
+          },
+          "progressive_passes": {
+            "offset": "0x64"
+          },
+          "pressures_attempted": {
+            "offset": "0x66"
+          },
+          "pressures_completed": {
+            "offset": "0x68"
+          },
+          "open_play_key_passes": {
+            "offset": "0x6A"
+          },
+          "npxg_x100": {
+            "offset": "0x6C"
+          },
+          "xg_overperformance_x100": {
+            "offset": "0x6E"
+          },
+          "crosses_attempted": {
+            "offset": "0x70"
+          },
+          "crosses_completed": {
+            "offset": "0x72"
+          },
+          "shots_blocked": {
+            "offset": "0x74"
+          },
+          "headers_lost": {
+            "offset": "0x76"
+          }
+        },
+        "career_stats": {
+          "ptr_offset": "0x110",
+          "fields": {
+            "all_time_league_goals": {
+              "index": 3
+            },
+            "all_time_goals": {
+              "index": 4
+            },
+            "all_time_appearances": {
+              "index": 5
+            },
+            "all_time_league_appearances": {
+              "index": 7
+            }
+          }
+        }
+      },
+      "trait_map": {
+        "0,0": "runs_with_ball_down_left",
+        "0,1": "runs_with_ball_down_right",
+        "0,2": "runs_with_ball_down_center",
+        "0,3": "gets_into_opposition_area",
+        "0,4": "moves_into_channels",
+        "0,5": "gets_forward_whenever_possible",
+        "0,6": "plays_short_simple_passes",
+        "0,7": "tries_killer_balls_often",
+        "1,0": "shoots_from_distance",
+        "1,1": "shoots_with_power",
+        "1,2": "places_shots",
+        "1,3": "curls_ball",
+        "1,4": "likes_to_round_keeper",
+        "1,5": "likes_to_break_offside_trap",
+        "1,6": "uses_outside_of_foot",
+        "1,7": "marks_opponent_tightly",
+        "2,0": "winds_up_opponents",
+        "2,1": "argues_with_officials",
+        "2,2": "plays_with_back_to_goal",
+        "2,3": "comes_deep_to_get_ball",
+        "2,4": "plays_one_twos",
+        "2,5": "likes_to_lob_keeper",
+        "2,6": "dictates_tempo",
+        "2,7": "attempts_overhead_kicks",
+        "3,0": "looks_for_pass_rather_than_scoring",
+        "3,1": "plays_no_through_balls",
+        "3,2": "stops_play",
+        "3,3": "knocks_ball_past_opponent",
+        "3,4": "moves_ball_to_right_foot_before_dribble",
+        "3,5": "moves_ball_to_left_foot_before_dribble",
+        "3,6": "dwells_on_ball",
+        "3,7": "arrives_late_in_opponents_area",
+        "4,0": "tries_to_play_way_out_of_trouble",
+        "4,1": "stays_back_at_all_times",
+        "4,2": "avoids_using_weaker_foot",
+        "4,3": "tries_tricks",
+        "4,4": "tries_long_range_free_kicks",
+        "4,5": "dives_into_tackles",
+        "4,6": "does_not_dive_into_tackles",
+        "4,7": "cuts_inside_from_both_wings",
+        "5,0": "hugs_line",
+        "5,1": "gets_crowd_going",
+        "5,2": "tries_first_time_shots",
+        "5,3": "tries_long_range_passes",
+        "5,4": "likes_ball_played_into_feet",
+        "5,5": "hits_free_kick_with_power",
+        "5,6": "likes_to_beat_man_repeatedly",
+        "5,7": "likes_to_switch_ball_to_other_flank",
+        "6,2": "possesses_long_flat_throw",
+        "6,3": "runs_with_ball_often",
+        "6,4": "runs_with_ball_rarely",
+        "6,6": "does_not_move_into_channels",
+        "6,7": "uses_long_throw_to_start_counter_attacks",
+        "7,0": "refrains_from_taking_long_shots",
+        "7,1": "cuts_inside_from_left_wing",
+        "7,2": "cuts_inside_from_right_wing",
+        "7,3": "crosses_early",
+        "7,4": "brings_ball_out_of_defense",
+        "7,7": "plays_ball_with_feet"
+      }
+    },
+    {
+      "fm_version": "26.3.2+2329565",
+      "person_base": "0x288",
+      "birth_date_offset": "0x310",
+      "regen_uid_threshold": 2002068000,
+      "chain": {
+        "chain_offset_1": "0x04E35E20",
+        "chain_offset_2": "0x04E35F60"
+      },
+      "savegame_id_chain": {
+        "savegame_id_rva": "0x04E35F60",
+        "alt_rva": "0x04E44950",
+        "field_off": "0xB8",
+        "session_nonce_off": "0xBC"
+      },
+      "save_name": {
+        "module": "game_plugin.dll",
+        "owners": [
+          {
+            "rtti": ".?AVSAVE_SYSTEM@@",
+            "name_off": "0x20"
+          },
+          {
+            "rtti": ".?AVGAME_GAME_DATABASE_RECORD@@",
+            "name_off": "0x8"
+          }
+        ]
+      },
+      "game_date_chain": {
+        "game_date_rva": "0x4DF3C18"
+      },
+      "person_table_chain": {
+        "person_root_rva": "0x4E495E0",
+        "container_off": "0x80",
+        "anchor_uid": 352
+      },
+      "human_manager_chain": {
+        "mgr_hnp_rva": "0x4E360F8",
+        "hmgr_start_off": "0x18",
+        "hmgr_end_off": "0x20",
+        "human_manager_offset": "0x450"
+      },
+      "human_manager_rtti": ".?AVHUMAN_NON_PLAYER@db@@",
+      "nplo_offsets": {
+        "apanp_staff_off": "0x280",
+        "home_rep": "0xD4",
+        "cur_rep": "0xD6",
+        "world_rep": "0xD8",
+        "ca": "0xDA",
+        "pa": "0xDC",
+        "tendencies_ptr": "0xA8",
+        "scouting_knowledge_ptr": "0xB0",
+        "coaching_style": "0xE9",
+        "preferred_formation": "0xDF",
+        "second_formation": "0xE0",
+        "defensive_formation": "0xE1",
+        "attacking_formation": "0xE2",
+        "attrs_base": "0x10",
+        "coaching_license_from_person": "0x13C"
+      },
+      "staff_attrs_u8": {
+        "tactical_attacking": "0x10",
+        "chairman_business": "0x11",
+        "tactical_depth_technique": "0x12",
+        "tactical_directness": "0x13",
+        "mental_authority": "0x14",
+        "tactical_free_roles": "0x15",
+        "chairman_interference": "0x16",
+        "tactical_marking": "0x17",
+        "tactical_offside": "0x18",
+        "chairman_patience": "0x19",
+        "tactical_pressing_intensity": "0x1A",
+        "chairman_resources": "0x1B",
+        "coaching_working_with_youngsters": "0x1C",
+        "tactical_fluidity": "0x24",
+        "tactical_flexibility": "0x25",
+        "non_tactical_buying_players": "0x1E",
+        "non_tactical_mind_games": "0x1F",
+        "tactical_sitting_back": "0x20",
+        "tactical_use_of_playmaker": "0x21",
+        "tactical_use_of_substitutions": "0x22",
+        "tactical_defensive_line": "0x23",
+        "non_tactical_hardness_of_training": "0x26",
+        "non_tactical_squad_rotation": "0x27",
+        "tactical_tempo": "0x28",
+        "tactical_width": "0x29"
+      },
+      "staff_attrs_fm": {
+        "mental_determination": "0x1D",
+        "coaching_goalkeeping": "0x2B",
+        "judging_player_ability": "0x2C",
+        "judging_player_potential": "0x2D",
+        "people_management": "0x2E",
+        "motivating": "0x2F",
+        "physiotherapy": "0x30",
+        "tactical_knowledge": "0x31",
+        "coaching_attacking": "0x32",
+        "coaching_defending": "0x33",
+        "coaching_fitness": "0x34",
+        "coaching_possession": "0x35",
+        "coaching_technical": "0x36",
+        "coaching_tactical": "0x37",
+        "tactical_dirtiness_allowance": "0x38",
+        "non_tactical_versatility": "0x3B",
+        "analysing_data": "0x3C",
+        "sports_science": "0x3F",
+        "tactical_eccentricity": "0x40",
+        "negotiating": "0x41",
+        "judging_staff_ability": "0x42",
+        "coaching_set_pieces": "0x43"
+      },
+      "mano_offsets": {
+        "mcha": "0x43C",
+        "scouting_centre_ptr": "0x370",
+        "ppro": "0x110",
+        "pfl1": "0x404",
+        "pfl2": "0x405"
+      },
+      "mano_characteristics": {
+        "managing_finances": "0x0",
+        "handling_team_discipline": "0x1",
+        "loyalty_to_players": "0x2",
+        "tactical_consistency": "0x3",
+        "domestic_player_bias": "0x4",
+        "hands_on_approach": "0x5",
+        "media_handling": "0x6"
+      },
+      "mano_scouting_offsets": {
+        "budget_season": "0xDF0",
+        "budget_available": "0xDF4",
+        "recruitment_package": "0xDFC"
+      },
+      "currency_table_chain": {
+        "currency_root_rva": "0x4E495A8",
+        "container_off": "0x80"
+      },
+      "currency_record_offsets": {
+        "uid": "0x0C",
+        "full_name": "0x18",
+        "short_name": "0x20",
+        "symbol": "0x30",
+        "exchange_rate": "0x38"
+      },
+      "club_table_chain": {
+        "club_root_rva": "0x4E49588",
+        "container_off": "0x80"
+      },
+      "team_table_chain": {
+        "team_root_rva": "0x4E49610",
+        "container_off": "0x80"
+      },
+      "comp_table_chain": {
+        "comp_root_rva": "0x4E49590",
+        "container_off": "0x80"
+      },
+      "rtti_player_types": [
+        ".?AVACTUAL_PLAYER@db@@",
+        ".?AVACTUAL_PLAYER_AND_NON_PLAYER@db@@"
+      ],
+      "rtti_club_types": [
+        ".?AVCLUB@db@@"
+      ],
+      "rtti_team_types": [
+        ".?AVTEAM@db@@"
+      ],
+      "rtti_comp_types": [
+        ".?AVCOMP@db@@"
+      ],
+      "vtable_rvas": {
+        "vtb_club": "0x44BA518",
+        "vtb_team": "0x44C13A8",
+        "vtb_comp": "0x44BFE68"
+      },
+      "club_offsets": {
+        "uid": "0x0C",
+        "status": "0x16A",
+        "name_full": "0xC0",
+        "name_short": "0xC8",
+        "nation_ptr": "0xD8",
+        "first_team_container": "0x18",
+        "cino_ptr": "0xB0",
+        "cint_ptr": "0x100",
+        "fin_ptr": "0x150"
+      },
+      "club_cino_offsets": {
+        "avg_attendance": "0x68",
+        "min_attendance": "0x6C",
+        "max_attendance": "0x70",
+        "pref_formation": "0x74",
+        "nickname": "0x90",
+        "fg_color": "0xA0",
+        "bg_color": "0xA8"
+      },
+      "club_cint_offsets": {
+        "six_letter_name": "0x00",
+        "season_ticket_holders": "0xB8",
+        "year_founded": "0xD0",
+        "chairman_status": "0xD6",
+        "social_media_followers": "0xF0",
+        "social_stature": "0xF4",
+        "social_trendiness": "0xF6",
+        "supporter_loyalty": "0x10C",
+        "supporter_passion": "0x10D",
+        "supporter_patience": "0x10E",
+        "supporter_affluence": "0x10F",
+        "supporter_temperament": "0x110",
+        "supporter_expectations": "0x111",
+        "training_facilities": "0x118",
+        "morale": "0x119",
+        "youth_importance": "0x11E",
+        "ownership_type": "0x121",
+        "chairman_title": "0x122",
+        "youth_facilities": "0x123",
+        "youth_coaching": "0x124",
+        "youth_recruitment": "0x125"
+      },
+      "ownership_type_enum": {
+        "1": "Limited Liability Company",
+        "2": "Public Limited Company",
+        "3": "Member Owned (Elections)",
+        "4": "Member Owned (No Elections)",
+        "5": "Consortium Private Limited",
+        "6": "Consortium Public Limited"
+      },
+      "club_fin_offsets": {
+        "balance": "0x14",
+        "transfer_budget_current": "0x7CC",
+        "transfer_budget_season": "0x7D0",
+        "transfer_revenue_pct": "0x7D8",
+        "wage_budget": "0x810",
+        "max_wage_allowed": "0x814",
+        "wage_total": "0x818",
+        "wage_total_with_bonus": "0x81C",
+        "corporate_facilities": "0x8B5"
+      },
+      "comp_offsets": {
+        "uid": "0x0C",
+        "name_full": "0x40",
+        "name_short": "0x48",
+        "name_3letter": "0x50",
+        "continent_ptr": "0x58",
+        "nation_ptr": "0x60",
+        "cacm_ptr": "0xB0",
+        "clubs_foreign_eligible": "0x120",
+        "clubs_bottom_div": "0x124",
+        "clubs_total": "0x128",
+        "clubs_wildcard": "0x14C",
+        "pitch_min_length_dm": "0x15C",
+        "pitch_min_width_dm": "0x15E",
+        "pitch_max_length_dm": "0x160",
+        "pitch_max_width_dm": "0x162",
+        "div_position": "0x17E",
+        "reputation": "0x188",
+        "original_rep": "0x18A",
+        "squad_status_threshold": "0x198",
+        "level": "0x199",
+        "comp_type": "0x19C",
+        "league_or_cup": "0x19E",
+        "flags": "0x1A0",
+        "db_type_active": "0xF4",
+        "comp_category": "0xF8",
+        "is_female": "0xF9"
+      },
+      "comp_category_enum": {
+        "0": "Domestic Top Division",
+        "1": "Domestic Division",
+        "2": "Domestic Main Cup",
+        "3": "Domestic League Cup",
+        "4": "Domestic Cup",
+        "5": "Super Cup",
+        "6": "International Finals",
+        "7": "International Qualifiers",
+        "8": "Reserve Division",
+        "9": "Club Friendly",
+        "10": "Main Continental International Finals",
+        "11": "Main Continental International Qualifiers",
+        "12": "Club Finals",
+        "13": "Friendly",
+        "14": "Domestic Other Division",
+        "15": "U21 International Finals",
+        "16": "U21 International Qualifiers",
+        "17": "U19 International Finals",
+        "18": "U19 International Qualifiers",
+        "19": "U23 International Finals",
+        "20": "U23 International Qualifiers",
+        "21": "Club Champions Cup",
+        "22": "Cup Winners Cup",
+        "23": "Reserve Cup",
+        "24": "International Friendly",
+        "25": "U20 International Finals",
+        "26": "All Stars Cup",
+        "27": "U20 International Qualifiers",
+        "28": "Inactive Competition",
+        "29": "Inactive Other Competition",
+        "31": "U22 International Finals",
+        "32": "U22 International Qualifiers",
+        "33": "U23 Division",
+        "34": "U22 Division",
+        "35": "U21 Division",
+        "36": "U20 Division",
+        "37": "U19 Division",
+        "38": "U18 Division",
+        "39": "Youth Cup"
+      },
+      "nation_offsets": {
+        "nation_name_ptr": "0x18",
+        "short_name_ptr": "0x20",
+        "abbrev_3letter_ptr": "0x28",
+        "name_blob_ptr": "0x30"
+      },
+      "cono_offsets": {
+        "name": "0x18"
+      },
+      "comp_league_chain": {
+        "cacm_off": "0xB0",
+        "clge_off_in_cacm": "0x1C0"
+      },
+      "team_offsets": {
+        "uid": "0x0C",
+        "team_type": "0x28",
+        "min_age": "0x2C",
+        "max_age": "0x2D",
+        "club_ptr": "0x30",
+        "player_roster_begin": "0x38",
+        "comp_ptr": "0x50",
+        "next_comp_ptr": "0x58",
+        "stadium_ptr": "0x78",
+        "manager_ptr": "0x80",
+        "reputation": "0xA8"
+      },
+      "stadium_offsets": {
+        "name_blob_ptr": "0x40"
+      },
+      "retirement_table_chain": {
+        "ret_mgr_rva": "0x4E3ACE0",
+        "vec_begin_off": "0x30",
+        "vec_end_off": "0x38",
+        "record_rwid_off": "0x00",
+        "record_date_off": "0x0C"
+      },
+      "pero_chain": {
+        "pero_pflc": "0x330",
+        "pero_pcti": "0x10",
+        "teao_tclu": "0x30",
+        "objo_duni": "0x0C",
+        "objo_duni_person": "0x294"
+      },
+      "loan_contract_chain": {
+        "potc_ptr_off": "0xB0",
+        "lnc_off_in_potc": "0x0"
+      },
+      "loan_contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x20",
+        "start": "0x44",
+        "end": "0x48",
+        "sign_date": "0x4C",
+        "agreed_playing_time": "0x54",
+        "squad_num": "0x5D",
+        "flags": "0xA0",
+        "buy_fee": "0xB0",
+        "monthly_fee": "0xBC",
+        "agreed_squad_num": "0xE8",
+        "purchase_after_matches": "0xEF"
+      },
+      "other_contracts_chain": {
+        "potc_ptr_off": "0xB0",
+        "lnc_off_in_potc": "0x0",
+        "bclub_off_in_potc": "0x8",
+        "nation_off_in_potc": "0x10"
+      },
+      "b_club_contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x20",
+        "job_type": "0x26",
+        "start": "0x44",
+        "end": "0x48",
+        "agreed_playing_time": "0x54",
+        "squad_num": "0x5D"
+      },
+      "future_transfer_chain": {
+        "mgr_rva": "0x4E35E20",
+        "transfer_vec_begin_off": "0x20",
+        "transfer_vec_end_off": "0x28",
+        "ptrn_off_from_person": "0x98",
+        "ptrn_idx_begin_off": "0x00",
+        "ptrn_idx_end_off": "0x08"
+      },
+      "future_transfer_offsets": {
+        "flags": "0x30",
+        "ttst": "0x8D",
+        "player_ptr": "0x38",
+        "dest_team_ptr": "0x40",
+        "src_team_ptr": "0x50",
+        "fee": "0x58",
+        "date_offer": "0x74",
+        "date_2": "0x78",
+        "date_effective": "0x7C"
+      },
+      "entity_offsets": {
+        "pfl1": "0x2A1",
+        "is_female_bit": 4,
+        "pfl2": "0x3BA",
+        "nation_ptr": "0x2F0",
+        "contract_ptr": "0x330",
+        "trait_blob": "0x348",
+        "joined_date": "0x3A4",
+        "moved_date": "0x3A8",
+        "injury_list": "0xF8",
+        "current_team_ptr": "0x130",
+        "guide_value": "0x234",
+        "transfer_value": "0x238"
+      },
+      "contract_offsets": {
+        "team_ptr": "0x10",
+        "wage": "0x20",
+        "job_type": "0x26",
+        "start": "0x44",
+        "end": "0x48",
+        "sign_date": "0x4C",
+        "agreed_playing_time": "0x54",
+        "transfer_flags": "0x57",
+        "squad_num": "0x5D",
+        "loyalty_bonus": "0xA8",
+        "agent_fees": "0xAC",
+        "contract_type": "0xC3"
+      },
+      "agreed_playing_time_enum": {
+        "1": "Star Player",
+        "2": "Important Player",
+        "3": "Regular Starter",
+        "4": "Squad Player",
+        "5": "Impact Sub",
+        "7": "Fringe Player",
+        "9": "Emergency Backup",
+        "10": "Breakthrough Prospect",
+        "11": "Future Prospect",
+        "13": "Youngster",
+        "14": "Not Available",
+        "15": "First-Choice Goalkeeper",
+        "16": "Cup Goalkeeper",
+        "17": "Domestic Cup Goalkeeper",
+        "18": "Continental Cup Goalkeeper",
+        "20": "Backup",
+        "21": "Emergency Backup",
+        "22": "Surplus to Requirements"
+      },
+      "team_type_enum": {
+        "0": "First Team",
+        "1": "Reserves",
+        "2": "A Team",
+        "3": "B Team",
+        "4": "Superdraft A",
+        "5": "Superdraft B",
+        "6": "Superdraft C",
+        "7": "Superdraft D",
+        "8": "Waivers",
+        "9": "U23",
+        "10": "U21",
+        "11": "U19",
+        "12": "U18",
+        "13": "C Team",
+        "14": "Amateur",
+        "15": "II",
+        "16": "Team 2",
+        "17": "Team 3",
+        "18": "U20",
+        "22": "Youth Evaluation",
+        "30": "Dutch Reserves",
+        "33": "U22",
+        "36": "U19 B Team",
+        "37": "U18 B Team",
+        "38": "All",
+        "39": "All Youth",
+        "40": "Highest Youth",
+        "41": "Lowest Youth",
+        "42": "All Non-First",
+        "44": "Second XI"
+      },
+      "contract_type_enum": {
+        "1": "Full Time",
+        "2": "Amateur",
+        "3": "Youth",
+        "4": "Non-Contract",
+        "5": "Future Professional",
+        "7": "Reserve (USA)",
+        "9": "Designated Player (USA)",
+        "10": "Senior Minimum Salary (USA)",
+        "11": "Generation Adidas (USA)",
+        "13": "Designated Player",
+        "15": "Scholarship Player (Australia)",
+        "16": "Guest Player (Australia)",
+        "18": "Mature Age Rookie Player (Australia)",
+        "21": "NWSL Senior"
+      },
+      "injury_container_offsets": {
+        "inj_begin": "0x0",
+        "inj_end": "0x8",
+        "ban_begin": "0x18",
+        "ban_end": "0x20"
+      },
+      "name_inline": {
+        "full_name": "0x2C8"
+      },
+      "name_nested": {
+        "first_name": "0x2D8",
+        "last_name": "0x2E0",
+        "common_name": "0x2E8"
+      },
+      "positions_u8": {
+        "pos_gk": "0x150",
+        "pos_sw": "0x151",
+        "pos_dl": "0x152",
+        "pos_dc": "0x153",
+        "pos_dr": "0x154",
+        "pos_dm": "0x155",
+        "pos_ml": "0x156",
+        "pos_mc": "0x157",
+        "pos_mr": "0x158",
+        "pos_aml": "0x159",
+        "pos_amc": "0x15A",
+        "pos_amr": "0x15B",
+        "pos_st": "0x15C",
+        "pos_wbl": "0x15D",
+        "pos_wbr": "0x15E"
+      },
+      "attrs_u8": {
+        "crossing": "0x15F",
+        "dribbling": "0x160",
+        "finishing": "0x161",
+        "heading": "0x162",
+        "long_shots": "0x163",
+        "marking": "0x164",
+        "off_the_ball": "0x165",
+        "passing": "0x166",
+        "penalty_taking": "0x167",
+        "tackling": "0x168",
+        "vision": "0x169",
+        "handling": "0x16A",
+        "aerial_reach": "0x16B",
+        "command_of_area": "0x16C",
+        "communication": "0x16D",
+        "kicking": "0x16E",
+        "throwing": "0x16F",
+        "anticipation": "0x170",
+        "decisions": "0x171",
+        "one_on_ones": "0x172",
+        "positioning": "0x173",
+        "reflexes": "0x174",
+        "first_touch": "0x175",
+        "technique": "0x176",
+        "left_foot": "0x177",
+        "right_foot": "0x178",
+        "flair": "0x179",
+        "corners": "0x17A",
+        "teamwork": "0x17B",
+        "work_rate": "0x17C",
+        "long_throws": "0x17D",
+        "eccentricity": "0x17E",
+        "rushing_out": "0x17F",
+        "punching": "0x180",
+        "acceleration": "0x181",
+        "free_kicks": "0x182",
+        "strength": "0x183",
+        "stamina": "0x184",
+        "pace": "0x185",
+        "jumping_reach": "0x186",
+        "leadership": "0x187",
+        "dirtiness": "0x188",
+        "balance": "0x189",
+        "bravery": "0x18A",
+        "consistency": "0x18B",
+        "aggression": "0x18C",
+        "agility": "0x18D",
+        "important_matches": "0x18E",
+        "injury_proneness": "0x18F",
+        "versatility": "0x190",
+        "natural_fitness": "0x191",
+        "determination": "0x192",
+        "composure": "0x193",
+        "concentration": "0x194"
+      },
+      "personality_u8": {
+        "adaptability": "0x2F8",
+        "ambition": "0x2F9",
+        "loyalty": "0x2FA",
+        "pressure": "0x2FB",
+        "professionalism": "0x2FC",
+        "sportsmanship": "0x2FD",
+        "temperament": "0x2FE",
+        "controversy": "0x2FF"
+      },
+      "stats_u8": {
+        "morale": "0x26C",
+        "height": "0x22E",
+        "u21_apps": "0x3C0",
+        "u21_goals": "0x3C1",
+        "nationality_info": "0x26E"
+      },
+      "appearance_u8": {
+        "ethnicity": "0x315",
+        "hair_colour": "0x316",
+        "hair_length": "0x317",
+        "skin_tone": "0x318"
+      },
+      "job_pref_u8": {
+        "manager": "0x358",
+        "assistant_manager": "0x359",
+        "coach": "0x35A",
+        "physio": "0x35B",
+        "scout": "0x35C",
+        "goalkeeping_coach": "0x35D",
+        "fitness_coach": "0x35E",
+        "set_piece_coach": "0x35F",
+        "chairman": "0x360",
+        "director_of_football": "0x361",
+        "head_of_youth_dev": "0x362",
+        "loan_manager": "0x363",
+        "data_analyst": "0x364",
+        "sports_scientist": "0x365",
+        "technical_director": "0x366"
+      },
+      "stats_u16": {
+        "ca": "0x264",
+        "pa": "0x266",
+        "sharpness": "0x258",
+        "fatigue": "0x25A",
+        "fitness": "0x25C",
+        "home_rep": "0x25E",
+        "cur_rep": "0x260",
+        "world_rep": "0x262",
+        "intl_apps": "0x3BC",
+        "intl_goals": "0x3BE"
+      },
+      "season_stats": {
+        "rdi_offset": "0x108",
+        "lvl1_slot_offset": "0x48",
+        "lvl1_fields": {
+          "struct_base_ptr": {
+            "offset": "0x00",
+            "type": "u64",
+            "stat": "ptr to 120-byte stat block"
+          },
+          "rating_sum_x10": {
+            "offset": "0x08",
+            "type": "u16",
+            "stat": "sum of match ratings \u00d710; avg = value / 10 / completed_appearances"
+          },
+          "minutes": {
+            "offset": "0x0A",
+            "type": "u16",
+            "stat": "total season minutes"
+          },
+          "starts_and_subs": {
+            "offset": "0x0C",
+            "type": "u16_packed",
+            "lo": "starts",
+            "hi": "sub_appearances"
+          },
+          "goals_and_apps": {
+            "offset": "0x0E",
+            "type": "u16_packed",
+            "lo": "completed_appearances",
+            "hi": "goals"
+          },
+          "gconceded_assists": {
+            "offset": "0x10",
+            "type": "u16_packed",
+            "lo": "assists",
+            "hi": "goals_conceded (GK only; outfield=0)"
+          },
+          "pen_scored_taken": {
+            "offset": "0x12",
+            "type": "u16_packed",
+            "lo": "penalties_taken",
+            "hi": "penalties_scored"
+          },
+          "rc_and_pom": {
+            "offset": "0x14",
+            "type": "u16_packed",
+            "lo": "player_of_match",
+            "hi": "red_cards"
+          },
+          "cleansheets_yc": {
+            "offset": "0x16",
+            "type": "u16_packed",
+            "lo": "yellow_cards",
+            "hi": "clean_sheets (GK only; outfield=0)"
+          },
+          "unknown_0x18": {
+            "offset": "0x18",
+            "type": "u16",
+            "stat": "unknown (~44-51; possibly team total games)"
+          }
+        },
+        "struct_base_fields": {
+          "team_goals": {
+            "offset": "0x00"
+          },
+          "team_goals_conceded": {
+            "offset": "0x02"
+          },
+          "games_won": {
+            "offset": "0x04"
+          },
+          "games_lost": {
+            "offset": "0x06"
+          },
+          "passes_attempted": {
+            "offset": "0x08"
+          },
+          "passes_completed": {
+            "offset": "0x0A"
+          },
+          "tackles_attempted": {
+            "offset": "0x0C"
+          },
+          "tackles_completed": {
+            "offset": "0x0E"
+          },
+          "headers_attempted": {
+            "offset": "0x10"
+          },
+          "headers_won": {
+            "offset": "0x12"
+          },
+          "dribbles": {
+            "offset": "0x14"
+          },
+          "fouls_made": {
+            "offset": "0x16"
+          },
+          "fouls_against": {
+            "offset": "0x18"
+          },
+          "shots": {
+            "offset": "0x1A"
+          },
+          "shots_on_target": {
+            "offset": "0x1C"
+          },
+          "unknown_0x1E": {
+            "offset": "0x1E"
+          },
+          "unknown_0x20": {
+            "offset": "0x20"
+          },
+          "unknown_0x22": {
+            "offset": "0x22"
+          },
+          "unknown_0x24": {
+            "offset": "0x24"
+          },
+          "mistakes_leading_to_goals": {
+            "offset": "0x28"
+          },
+          "minutes_since_last_goal": {
+            "offset": "0x2A"
+          },
+          "minutes_since_last_conceded": {
+            "offset": "0x2C"
+          },
+          "distance_x10": {
+            "offset": "0x2E"
+          },
+          "offsides": {
+            "offset": "0x30"
+          },
+          "opc_attempted_or_saves_tipped": {
+            "offset": "0x32"
+          },
+          "open_play_crosses_completed": {
+            "offset": "0x34"
+          },
+          "key_passes": {
+            "offset": "0x36"
+          },
+          "key_tackles": {
+            "offset": "0x38"
+          },
+          "unknown_0x3A": {
+            "offset": "0x3A"
+          },
+          "interceptions": {
+            "offset": "0x3C"
+          },
+          "clear_cut_chances_created": {
+            "offset": "0x3E"
+          },
+          "blocks": {
+            "offset": "0x40"
+          },
+          "possession_lost": {
+            "offset": "0x44"
+          },
+          "possession_won": {
+            "offset": "0x46"
+          },
+          "xg_x100": {
+            "offset": "0x48"
+          },
+          "xa_x100": {
+            "offset": "0x4A"
+          },
+          "clearances": {
+            "offset": "0x4C"
+          },
+          "free_kick_shots": {
+            "offset": "0x50"
+          },
+          "goals_from_outside_box": {
+            "offset": "0x52"
+          },
+          "unknown_0x54": {
+            "offset": "0x54"
+          },
+          "unknown_0x56": {
+            "offset": "0x56"
+          },
+          "unknown_0x58": {
+            "offset": "0x58"
+          },
+          "open_play_crosses_attempted": {
+            "offset": "0x5A"
+          },
+          "shots_from_outside_box": {
+            "offset": "0x5C"
+          },
+          "expected_goals_prevented_x100": {
+            "offset": "0x5E"
+          },
+          "sprints": {
+            "offset": "0x60"
+          },
+          "progressive_passes": {
+            "offset": "0x64"
+          },
+          "pressures_attempted": {
+            "offset": "0x66"
+          },
+          "pressures_completed": {
+            "offset": "0x68"
+          },
+          "open_play_key_passes": {
+            "offset": "0x6A"
+          },
+          "npxg_x100": {
+            "offset": "0x6C"
+          },
+          "xg_overperformance_x100": {
+            "offset": "0x6E"
+          },
+          "crosses_attempted": {
+            "offset": "0x70"
+          },
+          "crosses_completed": {
+            "offset": "0x72"
+          },
+          "shots_blocked": {
+            "offset": "0x74"
+          },
+          "headers_lost": {
+            "offset": "0x76"
+          }
+        },
+        "career_stats": {
+          "ptr_offset": "0x110",
+          "fields": {
+            "all_time_league_goals": {
+              "index": 3
+            },
+            "all_time_goals": {
+              "index": 4
+            },
+            "all_time_appearances": {
+              "index": 5
+            },
+            "all_time_league_appearances": {
+              "index": 7
+            }
+          }
+        }
+      },
+      "trait_map": {
+        "0,0": "runs_with_ball_down_left",
+        "0,1": "runs_with_ball_down_right",
+        "0,2": "runs_with_ball_down_center",
+        "0,3": "gets_into_opposition_area",
+        "0,4": "moves_into_channels",
+        "0,5": "gets_forward_whenever_possible",
+        "0,6": "plays_short_simple_passes",
+        "0,7": "tries_killer_balls_often",
+        "1,0": "shoots_from_distance",
+        "1,1": "shoots_with_power",
+        "1,2": "places_shots",
+        "1,3": "curls_ball",
+        "1,4": "likes_to_round_keeper",
+        "1,5": "likes_to_break_offside_trap",
+        "1,6": "uses_outside_of_foot",
+        "1,7": "marks_opponent_tightly",
+        "2,0": "winds_up_opponents",
+        "2,1": "argues_with_officials",
+        "2,2": "plays_with_back_to_goal",
+        "2,3": "comes_deep_to_get_ball",
+        "2,4": "plays_one_twos",
+        "2,5": "likes_to_lob_keeper",
+        "2,6": "dictates_tempo",
+        "2,7": "attempts_overhead_kicks",
+        "3,0": "looks_for_pass_rather_than_scoring",
+        "3,1": "plays_no_through_balls",
+        "3,2": "stops_play",
+        "3,3": "knocks_ball_past_opponent",
+        "3,4": "moves_ball_to_right_foot_before_dribble",
+        "3,5": "moves_ball_to_left_foot_before_dribble",
+        "3,6": "dwells_on_ball",
+        "3,7": "arrives_late_in_opponents_area",
+        "4,0": "tries_to_play_way_out_of_trouble",
+        "4,1": "stays_back_at_all_times",
+        "4,2": "avoids_using_weaker_foot",
+        "4,3": "tries_tricks",
+        "4,4": "tries_long_range_free_kicks",
+        "4,5": "dives_into_tackles",
+        "4,6": "does_not_dive_into_tackles",
+        "4,7": "cuts_inside_from_both_wings",
+        "5,0": "hugs_line",
+        "5,1": "gets_crowd_going",
+        "5,2": "tries_first_time_shots",
+        "5,3": "tries_long_range_passes",
+        "5,4": "likes_ball_played_into_feet",
+        "5,5": "hits_free_kick_with_power",
+        "5,6": "likes_to_beat_man_repeatedly",
+        "5,7": "likes_to_switch_ball_to_other_flank",
+        "6,2": "possesses_long_flat_throw",
+        "6,3": "runs_with_ball_often",
+        "6,4": "runs_with_ball_rarely",
+        "6,6": "does_not_move_into_channels",
+        "6,7": "uses_long_throw_to_start_counter_attacks",
+        "7,0": "refrains_from_taking_long_shots",
+        "7,1": "cuts_inside_from_left_wing",
+        "7,2": "cuts_inside_from_right_wing",
+        "7,3": "crosses_early",
+        "7,4": "brings_ball_out_of_defense",
+        "7,7": "plays_ball_with_feet"
+      }
+    }
+  ]
+}

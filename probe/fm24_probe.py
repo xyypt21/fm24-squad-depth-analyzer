@@ -35,6 +35,64 @@ from fm_memory import FmMemory
 
 FM_DIR = Path(r"C:\Users\xyy\Documents\Sports Interactive\Football Manager 2024")
 
+# ── 游戏内当前日期 ─────────────────────────────────────────
+# 年龄按"游戏内日期"计算，而非系统日期（否则会差约 3 岁）。
+# 与 FM Scouting Tool 一致：用游戏日期 + 精确周岁算法。
+# 游戏日期编码（相对 fm.exe 基址）：(年<<16) | 自 2004-10-10 起的天数。
+import datetime as _dt
+GAME_DATE_RVA = 0x631D5BC     # fm.exe 内游戏日期全局
+GAME_DATE_EPOCH = _dt.date(2004, 10, 10)
+# 兜底：读取失败时用的日期（当前存档 2023-07-17）
+GAME_DATE = _dt.date(2023, 7, 17)
+
+
+def read_game_date(mem):
+    """从游戏内存读当前日期（fm.exe 基址 + GAME_DATE_RVA）。失败返回 None。"""
+    try:
+        mods = mem.modules()
+        exe = next((m for m in mods if m[2].lower().endswith(".exe")), None)
+        if not exe:
+            return None
+        v = mem.read_u32(exe[0] + GAME_DATE_RVA)
+        if v is None:
+            return None
+        year = v >> 16
+        days = v & 0xFFFF
+        d = GAME_DATE_EPOCH + _dt.timedelta(days=days)
+        if 2000 <= year <= 2100 and d.year == year:
+            return d
+        return None
+    except Exception:
+        return None
+
+
+def refresh_game_date(mem):
+    """用游戏内存日期更新全局 GAME_DATE；读取失败则保持原值。"""
+    global GAME_DATE
+    d = read_game_date(mem)
+    if d is not None:
+        GAME_DATE = d
+    return GAME_DATE
+
+
+def calc_age(birth_date):
+    """按游戏日期 GAME_DATE 计算精确周岁（与 FM Scouting Tool 一致）。
+
+    FM Scouting Tool 的 calcAgeNum(birthDateStr)：
+      age = gameY - birthY
+      若 生日(月,日) 晚于 游戏日期(月,日)，则 age -= 1（未满周岁）
+    birth_date: datetime.date 或 None。
+    """
+    if not birth_date:
+        return None
+    try:
+        age = GAME_DATE.year - birth_date.year
+        if (GAME_DATE.month, GAME_DATE.day) < (birth_date.month, birth_date.day):
+            age -= 1
+        return age
+    except Exception:
+        return None
+
 
 # ── 已验证入口链（FM24 Epic 版, 相对 fm.exe 模块基址）────
 # 来源：对 FM Scouting Tool 26 做运行时钩子观察（frida 钩 ReadProcessMemory）
@@ -69,6 +127,71 @@ CLUB_ENTRY_STRUCT = 0x30     # 条目内 -> 俱乐部结构
 # 俱乐部结构（stride 0x100）：
 CLUB_STRUCT_UID = 0xC        # 结构内 club_uid
 CLUB_STRUCT_NAME = 0xC0      # 结构内 -> 名称缓冲([0]=len,[4]=串)
+
+
+# ── 位置字段（相对球员记录，u8 熟练度 0-20，值 >= 15 视为天然位置）────
+# 来源：FM Scouting Tool 26 的 info.json 偏移表（同版本 FM 记录布局一致，
+#       name_nested 0x2C0/0x2D0/0x2D8 与本工具实测完全吻合，可交叉验证）。
+P_POS_BASE = 0x208            # 位置数组起始（15 个连续 u8）
+POS_ORDER = ["pos_gk", "pos_sw", "pos_dl", "pos_dc", "pos_dr", "pos_dm",
+             "pos_ml", "pos_mc", "pos_mr", "pos_aml", "pos_amc", "pos_amr",
+             "pos_st", "pos_wbl", "pos_wbr"]
+# 每个槽 -> (角色, 侧别)。注意 pos_dm 是 DMC（防守中场居中），不是 D 加侧别 M。
+POS_ROLE_SIDE = {
+    "pos_gk": ("GK", None), "pos_sw": ("SW", None),
+    "pos_dl": ("D", "L"), "pos_dc": ("D", "C"), "pos_dr": ("D", "R"),
+    "pos_dm": ("DM", "C"),
+    "pos_ml": ("M", "L"), "pos_mc": ("M", "C"), "pos_mr": ("M", "R"),
+    "pos_aml": ("AM", "L"), "pos_amc": ("AM", "C"), "pos_amr": ("AM", "R"),
+    "pos_st": ("ST", "C"),
+    "pos_wbl": ("WB", "L"), "pos_wbr": ("WB", "R"),
+}
+POS_NATURAL_MIN = 15           # 熟练度阈值：>=15 为"天然"位置（FM Scouting Tool 用 15）
+POS_ROLE_ORDER = ["GK", "SW", "D", "WB", "DM", "M", "AM", "ST"]
+POS_SIDE_ORDER = ["R", "L", "C"]
+
+
+def _group_positions(values):
+    """把 15 个槽的熟练度合并成 FM 风格的位置串（如 'D (C), M (RLC)'）。
+
+    值 >= POS_NATURAL_MIN 的位置视为天然位置。按角色分组、侧别按 R/L/C
+    排序，输出 '角色 (侧别)'。返回 '-' 表示无天然位置。
+    """
+    by_role = {}
+    for i, slot in enumerate(POS_ORDER):
+        if values[i] < POS_NATURAL_MIN:
+            continue
+        role, side = POS_ROLE_SIDE[slot]
+        if side:
+            by_role.setdefault(role, []).append(side)
+        else:
+            by_role.setdefault(role, [])
+    if not by_role:
+        return "-"
+    parts = []
+    for role in POS_ROLE_ORDER:
+        if role not in by_role:
+            continue
+        sides = by_role[role]
+        if not sides:
+            parts.append(role)  # GK / SW 无侧别
+        else:
+            side_str = "".join(x for x in POS_SIDE_ORDER if x in sides)
+            parts.append(f"{role} ({side_str})")
+    return ", ".join(parts)
+
+
+def read_position(mem, rec):
+    """读取球员位置。返回位置数组（15 个 u8 熟练度）。"""
+    vals = [mem.read_u8(rec + P_POS_BASE + i) for i in range(15)]
+    return vals
+
+
+def position_text(values):
+    """把位置数组转成 FM 位置字符串（如 'D (C)'）。"""
+    if not values or len(values) != 15:
+        return "-"
+    return _group_positions(values)
 
 
 # ── 中文名（音译）逆向结论（2026-08-03 整理）──────────────────
@@ -239,6 +362,8 @@ def read_player(mem, rec):
             contract = _club_parent(mem, s10)
     # 当前俱乐部：+304 -> 条目 -> struct [+0xC]（父俱乐部，青年队自动归回本队）
     current = _club_parent(mem, mem.read_u64(rec + P_CLUB_CUR))
+    # 位置：15 个 u8 熟练度 -> FM 位置串
+    pos_values = read_position(mem, rec)
     return {
         "entity_id": mem.read_u32(rec + P_ENTITY_ID),
         "name": name,
@@ -246,6 +371,7 @@ def read_player(mem, rec):
         "pa": pa,
         "year": year,
         "doy": doy,
+        "position": position_text(pos_values),
         "contract": contract,
         "current": current,
         "club_entry": club_entry,
@@ -270,15 +396,6 @@ def collect_roster(mem):
             continue
         players.append(p)
     return players
-
-
-def read_position(mem, rec):
-    """读取球员位置字段。
-
-    位置偏移尚未定位（P_POSITION 未定义），返回 None。
-    定位方法：运行 fm24_probe.py --posprobe，把偏移填进 P_POSITION。
-    """
-    return None
 
 
 def _print_club_summary(mem, players):
@@ -319,23 +436,21 @@ def run_roster(mem, club_uid):
         return
 
     mine = [p for p in players if p["contract"] == club_uid]
-    mine.sort(key=lambda p: (-(p["ca"] or 0), -(p["pa"] or 0)))
+    mine.sort(key=lambda p: (-(p["pa"] or 0), -(p["ca"] or 0)))
     print(f"\n[roster] 俱乐部 {club_uid} {club_names.get(club_uid) or '?'} 球员 {len(mine)} 人：")
-    print(f"    {'姓名':<26}{'年龄':>4}{'生日':<12}{'CA':>4}{'PA':>4}  {'状态'}")
+    print(f"    {'姓名':<22}{'年龄':>4}{'位置':<22}{'CA':>4}{'PA':>4}  {'状态'}")
     for p in mine:
         loan = (p["current"] is not None and p["current"] != club_uid)
         age = None
         if p["year"] and 1900 < p["year"] < 2100:
             try:
-                import datetime
-                bd = datetime.date(p["year"], 1, 1) + datetime.timedelta(days=p["doy"] - 1)
-                age = (datetime.date.today() - bd).days // 365
+                bd = _dt.date(p["year"], 1, 1) + _dt.timedelta(days=p["doy"] - 1)
+                age = calc_age(bd)
             except Exception:
                 age = None
-        dob = doy_to_date(p["year"], p["doy"]) if p["year"] else "-"
         status = f"租出->{p['current']}" if loan else ""
-        print(f"    {str(p['name'] or '?')[:26]:<26}{str(age or '-'):>4}{dob:<12}"
-              f"{p['ca'] or '-':>4}{p['pa'] or '-':>4}  {status}")
+        print(f"    {str(p['name'] or '?')[:22]:<22}{str(age or '-'):>4}"
+              f"{(p['position'] or '-')[:22]:<22}{p['ca'] or '-':>4}{p['pa'] or '-':>4}  {status}")
     n_loan = sum(1 for p in mine if p["current"] is not None and p["current"] != club_uid)
     n_here = len(mine) - n_loan
     print(f"\n    在队 {n_here} 人，租出 {n_loan} 人。")
@@ -401,6 +516,10 @@ def main():
     mem = FmMemory.attach(r"^(fm|footballmanager)\.exe$")
     with mem:
         print(f"    附加成功 PID={mem.pid}")
+
+        # 读取游戏内当前日期（决定年龄计算基准）
+        d = refresh_game_date(mem)
+        print(f"    游戏日期: {d or '读取失败'}" + ("" if d else f"（沿用默认 {GAME_DATE}）"))
 
         # 2. 模块
         print("[2] 模块信息 ...")

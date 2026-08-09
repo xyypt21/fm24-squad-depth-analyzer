@@ -8,8 +8,6 @@ FM24 内存阵容分析 —— 直接从游戏内存读球员，复用 fm_analys
 
 前置条件：
     - FM24 运行中且已载入存档
-    - 位置字段已定位：先运行 fm24_probe.py --posprobe，把偏移填进
-      fm24_probe.py 的 P_POSITION（当前仍为 None 时会提示）
 """
 
 import argparse
@@ -23,18 +21,25 @@ for stream in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
+# 允许以 python probe/fm_mem_analysis.py 运行：probe/ 里的脚本能 import
+# 根目录的 fm_analysis / fm_positions 等模块。
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 from fm_memory import FmMemory
 from fm_analysis import analyze, OUTPUT
-from fm24_probe import collect_roster, read_position, _print_club_summary
+from fm24_probe import (collect_roster, _print_club_summary, calc_age,
+                        refresh_game_date, GAME_DATE)
 
 
-def calc_age(year, doy):
-    """由出生年/年内第几天算年龄，失败返回 None。"""
+def calc_age_from_ymd(year, doy):
+    """由出生年/年内第几天算出精确周岁（按游戏内日期，与 FM Scouting Tool 一致）。"""
     if not year or not (1900 < year < 2100):
         return None
     try:
         bd = datetime.date(year, 1, 1) + datetime.timedelta(days=doy - 1)
-        return (datetime.date.today() - bd).days // 365
+        return calc_age(bd)
     except Exception:
         return None
 
@@ -48,6 +53,10 @@ def main():
 
     mem = FmMemory.attach(r"^(fm|footballmanager)\.exe$")
     with mem:
+        print("[mem-analysis] 读取游戏日期 ...")
+        gd = refresh_game_date(mem)
+        print(f"    游戏日期: {gd or '读取失败'}" + ("" if gd else f"（沿用默认 {GAME_DATE}）"))
+
         print("[mem-analysis] 收集球员记录 ...")
         players = collect_roster(mem)
         print(f"    共 {len(players)} 名有合同球员")
@@ -61,12 +70,11 @@ def main():
         for p in players:
             if p["contract"] != args.club:
                 continue
-            pos = read_position(mem, p["rec"])
-            if pos is None:
-                print("!! 位置字段未定位：请先运行 fm24_probe.py --posprobe 定位偏移，"
-                      "再把偏移填进 fm24_probe.py 的 P_POSITION。")
+            pos = p.get("position") or "-"
+            if not pos or pos == "-":
+                print("!! 位置未读到（偏移失效？）")
                 return
-            age = calc_age(p["year"], p["doy"])
+            age = calc_age_from_ymd(p["year"], p["doy"])
             if age is None:
                 continue
             roster.append(dict(name=p["name"], age=age, position=pos,
