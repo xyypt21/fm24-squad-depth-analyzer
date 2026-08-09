@@ -14,21 +14,24 @@
         <div class="card-body">
             <div class="grid">
                 <div class='col'>
-                    {{PITCH_BEST}}
-                    <div class='col-header'>EA最佳11人<span class='col-avg'>均EA {{AVG_BEST}}</span></div>
+                    {{PITCH_CA_BEST}}
+                    <div class='col-header'>CA最佳11人<span class='col-avg'>均CA {{AVG_CA_BEST}}</span></div>
                 </div>
                 <div class='col'>
-                    {{PITCH_SECOND}}
-                    <div class='col-header'>EA次佳11人<span class='col-avg'>均EA {{AVG_SECOND}}</span></div>
+                    {{PITCH_CA_SECOND}}
+                    <div class='col-header'>CA次佳11人<span class='col-avg'>均CA {{AVG_CA_SECOND}}</span></div>
                 </div>
                 <div class='col'>
-                    <div class='pitch' style='overflow-y:auto;justify-content:flex-start;flex-direction:row;gap:4px;'>{{DEPTH_CHART}}</div>
-                    <div class='col-header'>深度图<span class='col-avg'>共{{DC_COUNT}}人</span></div>
+                    {{PITCH_EA_BEST}}
+                    <div class='col-header'>EA最佳11人<span class='col-avg'>均EA {{AVG_EA_BEST}}</span></div>
+                </div>
+                <div class='col'>
+                    {{PITCH_EA_SECOND}}
+                    <div class='col-header'>EA次佳11人<span class='col-avg'>均EA {{AVG_EA_SECOND}}</span></div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="footer">分析生成于 {{GENERATED_AT}}</div>
 </div>
 </body>
 </html>

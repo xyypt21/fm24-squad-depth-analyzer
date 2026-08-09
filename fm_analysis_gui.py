@@ -45,8 +45,11 @@ class FmGui:
 
         ea_row = ttk.Frame(frm)
         ea_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
+        self.min_age_var = tk.StringVar(value=str(self._config["min_age"]))
         self.ea_age_var = tk.StringVar(value=str(self._config["growth_until_age"]))
         self.ea_growth_var = tk.StringVar(value=str(self._config["growth_per_year"]))
+        ttk.Label(ea_row, text="最小年龄:").pack(side="left")
+        ttk.Entry(ea_row, textvariable=self.min_age_var, width=6).pack(side="left", padx=(0, 10))
         ttk.Label(ea_row, text="EA成长至年龄:").pack(side="left")
         ttk.Entry(ea_row, textvariable=self.ea_age_var, width=6).pack(side="left", padx=(0, 10))
         ttk.Label(ea_row, text="EA每年成长:").pack(side="left")
@@ -117,16 +120,18 @@ class FmGui:
             messagebox.showerror("错误", "阵容文件不存在，请检查路径。")
             return
         try:
+            min_age = int(self.min_age_var.get())
             growth_until_age = int(self.ea_age_var.get())
             growth_per_year = int(self.ea_growth_var.get())
-            if growth_until_age <= 0 or growth_per_year < 0:
+            if min_age <= 0 or growth_until_age <= 0 or growth_per_year < 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror("错误", "EA 参数必须是正整数（每年成长可为 0）。")
+            messagebox.showerror("错误", "参数必须是正整数（每年成长可为 0）。")
             return
         save_config(
             {
                 "rtf_path": self._as_tilde_path(self.rtf_var.get()),
+                "min_age": min_age,
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
             }
@@ -135,21 +140,22 @@ class FmGui:
         self.status.set("分析中...")
         self.log_line("-" * 40)
         self.log_line(f"读取: {self.rtf_var.get()}")
-        self.log_line(f"EA 参数: 成长至 {growth_until_age} 岁，每年 +{growth_per_year}")
+        self.log_line(f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}")
         thread = threading.Thread(
             target=self._analyze,
-            args=(growth_until_age, growth_per_year),
+            args=(min_age, growth_until_age, growth_per_year),
             daemon=True,
         )
         thread.start()
 
-    def _analyze(self, growth_until_age, growth_per_year):
+    def _analyze(self, min_age, growth_until_age, growth_per_year):
         try:
             rtf_path = Path(self.rtf_var.get()).expanduser()
             roster = read_roster_from_rtf(rtf_path)
             html = analyze(
                 roster,
                 output=OUTPUT,
+                min_age=min_age,
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
             )

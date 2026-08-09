@@ -16,7 +16,7 @@ from typing import List, Optional
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from fm_positions import DEPTH_SLOTS, SLOTS, player_can_play
+from fm_positions import SLOTS, player_can_play
 from fm_report import generate_full_html
 
 OUTPUT = Path(__file__).parent / "fm_analysis.html"
@@ -66,52 +66,40 @@ def select_best_xi(candidates: List[dict], sort_key: str) -> List[tuple]:
     return [(SLOTS[row], candidates[col]) for row, col in zip(row_indices, col_indices)]
 
 
-def filter_senior_players(players: List[dict]) -> List[dict]:
-    """Keep only players aged >= 17."""
-    return [p for p in players if p["age"] >= 17]
-
-
-def build_depth_chart(players: List[dict]) -> dict:
-    """Build depth-chart data per slot (full squad, players may appear twice)."""
-    depth = {}
-    for slot in DEPTH_SLOTS:
-        eligible = [p for p in players if player_can_play(p["position"], slot)]
-        eligible.sort(key=lambda p: p["ea"], reverse=True)
-        n = 6 if slot in ("DMC", "DC") else (3 if slot == "GK" else 4)
-        depth[slot] = eligible[:n]
-    return depth
-
-
 # ── Main flow ──────────────────────────────────────────────
 def analyze(
     roster: List[dict],
     output: Optional[Path] = None,
+    min_age: int = 17,
     growth_until_age: int = 21,
     growth_per_year: int = 20,
 ) -> Optional[str]:
     """
-    Core analysis flow: compute EA, pick the best and second-best XI,
-    and build the depth chart.
+    Core analysis flow: compute EA, pick the best and second-best XI for both
+    CA (current ability) and EA (expected ability).
     roster: list of player dicts, each with name/age/position/ca/pa.
     output: HTML output path, defaults to OUTPUT.
+    min_age: only players aged >= min_age are considered (default 17).
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     Returns the HTML string, or None if roster is empty.
     """
-    if not roster:
+    candidates = [p for p in roster if p["age"] >= min_age]
+    if not candidates:
         print("未找到阵容数据")
         return None
 
-    calculate_ea(roster, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
+    calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
 
-    candidates = filter_senior_players(roster)
-    ea_best = select_best_xi(candidates, "ea")
-    used_1 = {id(p) for _, p in ea_best}
-    ea_second = select_best_xi([p for p in candidates if id(p) not in used_1], "ea")
-    depth_chart = build_depth_chart(candidates)
+    ca_first = select_best_xi(candidates, "ca")
+    used_ca = {id(p) for _, p in ca_first}
+    ca_second = select_best_xi([p for p in candidates if id(p) not in used_ca], "ca")
 
-    dc_all = {id(p) for plist in depth_chart.values() for p in plist}
-    html = generate_full_html(ea_best, ea_second, depth_chart, len(dc_all))
+    ea_first = select_best_xi(candidates, "ea")
+    used_ea = {id(p) for _, p in ea_first}
+    ea_second = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
+
+    html = generate_full_html(ca_first, ca_second, ea_first, ea_second)
     out = output or OUTPUT
     out.write_text(html, encoding="utf-8")
     return html

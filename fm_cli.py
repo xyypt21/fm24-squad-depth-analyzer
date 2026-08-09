@@ -13,6 +13,7 @@ def main() -> None:
     roster = read_roster_from_rtf(config["rtf_path"])
     html = analyze(
         roster,
+        min_age=config["min_age"],
         growth_until_age=config["growth_until_age"],
         growth_per_year=config["growth_per_year"],
     )

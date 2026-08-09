@@ -4,11 +4,7 @@ FM2024 4-2-3-1 squad depth analysis - HTML report rendering.
 Renders the analysis results as a visual HTML report (pitch diagrams + depth chart).
 """
 
-from datetime import datetime
 from pathlib import Path
-
-from fm_positions import DEPTH_SLOT_MAP, DEPTH_SLOTS
-
 
 def compute_average(xi, sort_key):
     """Compute the average score of a starting XI."""
@@ -63,89 +59,18 @@ def render_pitch_card(xi, sort_key, reference=None):
     return f"<div class='pitch'>{render_pitch(xi, sort_key, reference or average)}</div>"
 
 
-def compute_scores(ea_first, ea_second, depth_data, ref):
-    """
-    Reinforcement score: the higher, the more reinforcement is needed,
-    up to 4 points per position.
-    Weak starter in this position +2, weak second XI player +1, plus the
-    ratio of weak players in the depth chart (rounded to 1 decimal).
-    """
-    scores = {}
-    for slot in DEPTH_SLOTS:
-        # ea_first/ea_second are lists ordered as SLOTS (index = slot position);
-        # indices maps this position to list indices, used to check whether the
-        # starter/second XI has a weak player here.
-        indices = DEPTH_SLOT_MAP[slot]
-        first_red = (
-            2
-            if any(i < len(ea_first) and is_weak(ea_first[i][1]["ea"], ref) for i in indices)
-            else 0
-        )
-        second_red = (
-            1
-            if any(i < len(ea_second) and is_weak(ea_second[i][1]["ea"], ref) for i in indices)
-            else 0
-        )
-        depth_players = depth_data.get(slot, [])
-        red_ratio = (
-            round(sum(1 for p in depth_players if is_weak(p["ea"], ref)) / len(depth_players), 1)
-            if depth_players
-            else 0
-        )
-        scores[slot] = first_red + second_red + red_ratio
-    return scores
-
-
-def render_depth_chart(depth_data, reference_value, scores=None):
-    """Render the depth chart (2-column layout, sorted by reinforcement score desc)."""
-    slots_sorted = sorted(DEPTH_SLOTS, key=lambda s: -(scores.get(s, 0) if scores else 0))
-
-    mid = (len(slots_sorted) + 1) // 2
-    columns = [slots_sorted[:mid], slots_sorted[mid:]]
-
-    def render_column(col_data):
-        parts = []
-        for slot in col_data:
-            players = depth_data.get(slot, [])
-            avg = int(sum(p["ea"] for p in players) / len(players)) if players else 0
-            items = ""
-            for p in players:
-                weak = " dc-weak" if is_weak(p["ea"], reference_value) else ""
-                items += (
-                    f"<div class='dc-item{weak}'>"
-                    f"<span class='dc-name'>{p['name']}</span>"
-                    f"<span class='dc-age'>{p['age']}岁</span>"
-                    f"<span class='dc-ca'>CA{p['ca']}</span>"
-                    f"<span class='dc-ea'>EA{p['ea']:.0f}</span>"
-                    f"</div>"
-                )
-            score = scores.get(slot, 0) if scores else 0
-            score_cls = " sc-low" if score == 0 else (" sc-mid" if score < 2 else " sc-high")
-            parts.append(
-                f"<div class='dc-section'>"
-                f"<div class='dc-header'>{slot}"
-                f"<span class='dc-score{score_cls}'>{score}</span> · 均{avg}</div>"
-                f"{items}"
-                f"</div>"
-            )
-        return "<div class='dc-col'>" + "\n".join(parts) + "</div>"
-
-    return render_column(columns[0]) + render_column(columns[1])
-
-
-def generate_full_html(ea_first, ea_second, depth_chart, dc_unique_count):
-    ref = compute_average(ea_first, "ea")
-    scores = compute_scores(ea_first, ea_second, depth_chart, ref)
+def generate_full_html(ca_first, ca_second, ea_first, ea_second):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
     css = (template_dir / "style.css").read_text(encoding="utf-8")
     return (
         template.replace("{{CSS_STYLE}}", css)
-        .replace("{{PITCH_BEST}}", render_pitch_card(ea_first, "ea"))
-        .replace("{{AVG_BEST}}", str(compute_average(ea_first, "ea")))
-        .replace("{{PITCH_SECOND}}", render_pitch_card(ea_second, "ea", ref))
-        .replace("{{AVG_SECOND}}", str(compute_average(ea_second, "ea")))
-        .replace("{{DEPTH_CHART}}", render_depth_chart(depth_chart, ref, scores))
-        .replace("{{DC_COUNT}}", str(dc_unique_count))
-        .replace("{{GENERATED_AT}}", datetime.now().strftime("%Y-%m-%d %H:%M"))
+        .replace("{{PITCH_CA_BEST}}", render_pitch_card(ca_first, "ca"))
+        .replace("{{PITCH_CA_SECOND}}", render_pitch_card(ca_second, "ca"))
+        .replace("{{PITCH_EA_BEST}}", render_pitch_card(ea_first, "ea"))
+        .replace("{{PITCH_EA_SECOND}}", render_pitch_card(ea_second, "ea"))
+        .replace("{{AVG_CA_BEST}}", str(compute_average(ca_first, "ca")))
+        .replace("{{AVG_CA_SECOND}}", str(compute_average(ca_second, "ca")))
+        .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
+        .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
     )
