@@ -16,7 +16,6 @@ import json
 import os
 import re
 import socket
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -29,6 +28,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "min_age": 17,
     "growth_until_age": 21,
     "growth_per_year": 20,
+    "translate_names": False,
 }
 
 
@@ -46,6 +46,7 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
         "min_age": int(merged["min_age"]),
         "growth_until_age": int(merged["growth_until_age"]),
         "growth_per_year": int(merged["growth_per_year"]),
+        "translate_names": bool(merged["translate_names"]),
     }
 
 
@@ -124,8 +125,6 @@ PROXY_URL = os.environ.get("FM_PROXY", "http://127.0.0.1:7897")
 
 # 单次请求超时（deep-translator 未显式设 timeout，代理不通会无限阻塞）
 _REQUEST_TIMEOUT = 10
-# 并发翻译线程数
-_MAX_WORKERS = 4
 # 单个名字失败重试次数
 _RETRIES = 2
 
@@ -136,25 +135,53 @@ def _proxies():
     return {"http": PROXY_URL, "https": PROXY_URL}
 
 
-def _translate_one(name, translator):
-    """翻译单个名字（失败重试）；成功写内存缓存，最终失败加入黑名单。"""
-    for _ in range(_RETRIES):
+def _translate_batch(names, proxies):
+    """把整批名字每行一个 "player:xxx" 拼成一段一次翻译，再按行拆回。
+
+    逐行 "player:" 前缀让 Google 把每行当球员名处理，能正确识别名/姓、保留
+    间隔号（·），且不会像 "name:" 那样把个别名字原样返回。
+    保持原始大小写。返回 {原名: 中文}；翻译异常/未命中的名字不返回。
+    """
+    if not names:
+        return {}
+    text = "\n".join("player:" + n for n in names)
+    try:
+        from deep_translator import GoogleTranslator  # noqa: PLC0415 延迟导入，加快启动
+
+        # deep-translator 未设 socket 超时，代理不通会无限阻塞；设全局默认超时兜底
+        _previous = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(_REQUEST_TIMEOUT)
         try:
-            cn = translator.translate(name)
-            cn = (cn or "").strip()
-            if cn and cn != name:
-                _cache[name] = cn
-                return name, cn
-        except Exception:
-            continue
-    _failed.add(name)
-    return name, None
+            out = GoogleTranslator(source="en", target="zh-CN", proxies=proxies).translate(text)
+        finally:
+            socket.setdefaulttimeout(_previous)
+    except ImportError:
+        return {}
+    if not out:
+        return {}
+
+    # 每行剥掉 "玩家：/球员：/姓名：/名称：" 前缀后与原名逐行对应
+    lines = []
+    for line in out.split("\n"):
+        line = line.strip()
+        for sep in ("：", ":"):
+            if sep in line:
+                line = line.split(sep, 1)[1].strip()
+                break
+        if line:
+            lines.append(line)
+    result = {}
+    for name, line in zip(names, lines):
+        if line and line != name:
+            result[name] = line
+    return result
 
 
 def _batch_translate(names):
-    """批量翻译一批名字：并发走 Google 翻译（经本地代理）。
+    """批量翻译一批名字：一次请求整批走 Google 翻译（经本地代理）。
 
-    返回 {name: 中文}；翻译异常/未命中的名字不返回（由调用方原样保留）。
+    保持原始大小写（小写会丢失名/姓间的间隔号 ·），
+    返回 {原名: 中文}；翻译异常/未命中的名字不返回（由调用方原样保留）。
     只走内存缓存，不写文件。
     """
     todo = []
@@ -167,42 +194,36 @@ def _batch_translate(names):
     if not todo:
         return result
 
-    try:
-        from deep_translator import GoogleTranslator  # noqa: PLC0415 延迟导入，加快启动
+    proxies = _proxies()
+    translated = {}
+    for _ in range(_RETRIES):
+        translated = _translate_batch(todo, proxies)
+        if translated:
+            break
 
-        # deep-translator 未设 socket 超时，代理不通会无限阻塞；设全局默认超时兜底
-        _previous = socket.getdefaulttimeout()
-        socket.setdefaulttimeout(_REQUEST_TIMEOUT)
-        try:
-            # 复用同一个 translator（requests 内部复用连接），并发翻译
-            translator = GoogleTranslator(source="auto", target="zh-CN", proxies=_proxies())
-            with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
-                futs = {pool.submit(_translate_one, n, translator) for n in todo}
-                for fut in futs:
-                    name, cn = fut.result()
-                    if cn:
-                        result[name] = cn
-        finally:
-            socket.setdefaulttimeout(_previous)
-    except ImportError:
-        pass
+    for name, cn in translated.items():
+        _cache[name] = cn
+        result[name] = cn
     return result
 
 
 def auto_translate(names):
-    """翻译一批英文名，全部走 Google 在线翻译（经本地代理），并发执行。"""
+    """翻译一批英文名，整批一次走 Google 在线翻译（经本地代理）。"""
     names = tuple(dict.fromkeys(names))
     if not names:
         return {}
     return _batch_translate(names)
 
 
-def _translate_xi_names(*xis) -> None:
-    """只翻译最终出现在网页（入选阵容）里的球员名字。
+def _translate_xi_names(*xis, translate: bool = True) -> None:
+    """把入选 XI 的球员名翻译成中文。
 
-    对多组 XI 去重收集名字，一次性并发走 Google 在线翻译（经本地代理），
+    translate: 为 False 时原样保留英文名。
+    启用时：对多组 XI 去重收集名字，整批一次走 Google 在线翻译（经本地代理），
     就地改 player dict 的 name，未命中的保持原样。
     """
+    if not translate:
+        return
     seen = set()
     names = []
     for xi in xis:
@@ -343,6 +364,7 @@ def analyze(
     min_age: int = 17,
     growth_until_age: int = 21,
     growth_per_year: int = 20,
+    translate: bool = True,
 ) -> Optional[str]:
     """
     Core analysis flow: compute EA, pick the best and second-best XI for both
@@ -352,6 +374,7 @@ def analyze(
     min_age: only players aged >= min_age are considered (default 17).
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
+    translate: translate selected player names to Chinese (default True).
     Returns the HTML string, or None if roster is empty.
     """
     candidates = [p for p in roster if p["age"] >= min_age]
@@ -370,7 +393,7 @@ def analyze(
     ea_second = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
 
     # 只翻译最终出现在网页（入选阵容）里的球员名字，避免多余请求
-    _translate_xi_names(ca_first, ca_second, ea_first, ea_second)
+    _translate_xi_names(ca_first, ca_second, ea_first, ea_second, translate=translate)
 
     html = generate_full_html(ca_first, ca_second, ea_first, ea_second)
     out = output or OUTPUT

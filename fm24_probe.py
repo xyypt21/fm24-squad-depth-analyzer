@@ -304,8 +304,9 @@ def _read_len_str(mem, ptr):
                 return raw.decode("utf-8", "replace")
         v = int.from_bytes(b[0:8], "little")
         # 名字缓冲地址范围随游戏更新而变（见 scan_player_records 注释），
-        # 放宽校验只要求落在已分配堆范围的上界内。
-        if v and v < 0x7FF000000000 and v >= 0x66000000:
+        # 且名字串可能分配在低地址堆区（实测 first 串可低至 0x3AAD720C）。
+        # 下界只过滤空指针/极小值即可，合法性由长度与 ASCII 校验兜底。
+        if v and 0x10000 <= v < 0x7FF000000000:
             ptr = v
             continue
         return None
@@ -442,7 +443,10 @@ def read_player(mem, rec, raw=None):
     full = _read_len_str(mem, _u64(P_NAME_FULL))
     first = _read_len_str(mem, _u64(P_NAME_FIRST))
     last = _read_len_str(mem, _u64(P_NAME_LAST))
-    name = full or ((first or "") + " " + (last or "")).strip() or None
+    # 优先用 名+姓 拼接：FULL 串可能含多余中间名（如 Forzan Assan Ouédraogo）。
+    # first 可能含多个词（如 Derry John），只取第一个；first/last 任一缺失时退回 FULL。
+    first_name = first.split(" ")[0] if first else ""
+    name = (first_name + " " + (last or "")).strip() or full or None
     ca = _u16(P_CA)
     pa = _u16(P_PA)
     year = _u16(P_BIRTH_YEAR)

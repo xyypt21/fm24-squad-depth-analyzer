@@ -51,32 +51,39 @@ class FmGui:
         ttk.Label(ea_row, text="EA每年成长:").pack(side="left")
         ttk.Entry(ea_row, textvariable=self.ea_growth_var, width=6).pack(side="left")
 
+        opt_row = ttk.Frame(frm)
+        opt_row.grid(row=2, column=0, columnspan=3, sticky="ew", **pad)
+        self.translate_var = tk.BooleanVar(value=bool(self._config.get("translate_names", False)))
+        ttk.Checkbutton(opt_row, text="翻译球员名字为中文", variable=self.translate_var).pack(
+            side="left"
+        )
+
         self.formula_var = tk.StringVar()
         ttk.Label(frm, textvariable=self.formula_var, foreground="#555", justify="left").grid(
-            row=2, column=0, columnspan=3, sticky="w", **pad
+            row=3, column=0, columnspan=3, sticky="w", **pad
         )
         self._update_formula()
         self.ea_age_var.trace_add("write", lambda *_: self._update_formula())
         self.ea_growth_var.trace_add("write", lambda *_: self._update_formula())
 
         btn_row = ttk.Frame(frm)
-        btn_row.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
+        btn_row.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
         self.run_btn = ttk.Button(btn_row, text="开始分析", command=self.start_analysis)
         self.run_btn.pack(side="left")
         ttk.Button(btn_row, text="退出", command=root.destroy).pack(side="right")
 
         self.log = tk.Text(frm, height=14, state="disabled", wrap="word")
-        self.log.grid(row=4, column=0, columnspan=3, sticky="nsew", **pad)
+        self.log.grid(row=5, column=0, columnspan=3, sticky="nsew", **pad)
         scroll = ttk.Scrollbar(frm, command=self.log.yview)
-        scroll.grid(row=4, column=3, sticky="ns")
+        scroll.grid(row=5, column=3, sticky="ns")
         self.log.configure(yscrollcommand=scroll.set)
 
         frm.columnconfigure(1, weight=1)
-        frm.rowconfigure(4, weight=1)
+        frm.rowconfigure(5, weight=1)
 
         self.status = tk.StringVar(value="就绪")
         ttk.Label(frm, textvariable=self.status).grid(
-            row=5, column=0, columnspan=3, sticky="w", **pad
+            row=6, column=0, columnspan=3, sticky="w", **pad
         )
 
     def log_line(self, text):
@@ -147,6 +154,7 @@ class FmGui:
                 "min_age": min_age,
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
+                "translate_names": self.translate_var.get(),
             }
         )
         self.run_btn.configure(state="disabled")
@@ -156,14 +164,15 @@ class FmGui:
         self.log_line(
             f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
         )
+        self.log_line(f"翻译球员名字: {'开启' if self.translate_var.get() else '关闭'}")
         thread = threading.Thread(
             target=self._analyze,
-            args=(club_uid, min_age, growth_until_age, growth_per_year),
+            args=(club_uid, min_age, growth_until_age, growth_per_year, self.translate_var.get()),
             daemon=True,
         )
         thread.start()
 
-    def _analyze(self, club_uid, min_age, growth_until_age, growth_per_year):
+    def _analyze(self, club_uid, min_age, growth_until_age, growth_per_year, translate):
         try:
             name, roster = read_squad_from_memory(club_uid)
             html = analyze(
@@ -172,6 +181,7 @@ class FmGui:
                 min_age=min_age,
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
+                translate=translate,
             )
             if html:
                 club = f"{club_uid}{(' ' + name) if name else ''}"
