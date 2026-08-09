@@ -7,7 +7,7 @@ Renders the analysis results as a visual HTML report (pitch diagrams + depth cha
 from datetime import datetime
 from pathlib import Path
 
-from fm_analysis import DEPTH_SLOT_MAP, DEPTH_SLOTS
+from fm_positions import DEPTH_SLOT_MAP, DEPTH_SLOTS
 
 
 def compute_average(xi, sort_key):

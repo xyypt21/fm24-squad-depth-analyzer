@@ -10,7 +10,9 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-import fm_analysis as fa
+from fm_analysis import OUTPUT, analyze
+from fm_config import load_config, save_config
+from fm_roster import read_roster_from_rtf
 
 
 class FmGui:
@@ -20,7 +22,7 @@ class FmGui:
         try:
             home = str(Path.home()).rstrip("\\/")
             p = str(Path(path))
-            return "~" + p[len(home):] if p.startswith(home) else p
+            return "~" + p[len(home) :] if p.startswith(home) else p
         except Exception:
             return path
 
@@ -34,7 +36,7 @@ class FmGui:
         frm = ttk.Frame(root, padding=10)
         frm.pack(fill="both", expand=True)
 
-        self._config = fa.load_config()
+        self._config = load_config()
         self.rtf_var = tk.StringVar(value=self._config["rtf_path"])
 
         ttk.Label(frm, text="阵容文件 (RTF):").grid(row=0, column=0, sticky="w", **pad)
@@ -104,7 +106,7 @@ class FmGui:
             self.rtf_var.set(path)
 
     def open_result(self):
-        path = fa.OUTPUT
+        path = OUTPUT
         if path.exists():
             os.startfile(str(path.resolve()))
         else:
@@ -122,7 +124,7 @@ class FmGui:
         except ValueError:
             messagebox.showerror("错误", "EA 参数必须是正整数（每年成长可为 0）。")
             return
-        fa.save_config(
+        save_config(
             {
                 "rtf_path": self._as_tilde_path(self.rtf_var.get()),
                 "growth_until_age": growth_until_age,
@@ -144,15 +146,15 @@ class FmGui:
     def _analyze(self, growth_until_age, growth_per_year):
         try:
             rtf_path = Path(self.rtf_var.get()).expanduser()
-            roster = fa.read_roster_from_rtf(rtf_path)
-            html = fa.analyze(
+            roster = read_roster_from_rtf(rtf_path)
+            html = analyze(
                 roster,
-                output=fa.OUTPUT,
+                output=OUTPUT,
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
             )
             if html:
-                message = f"完成：共 {len(roster)} 名球员，结果已写入 {fa.OUTPUT}"
+                message = f"完成：共 {len(roster)} 名球员，结果已写入 {OUTPUT}"
             else:
                 message = "未找到阵容数据，请确认 RTF 文件格式正确。"
         except Exception as exc:

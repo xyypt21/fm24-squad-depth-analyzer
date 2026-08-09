@@ -40,7 +40,7 @@ python fm_analysis_gui.py
 ### 命令行
 
 ```bash
-python fm_analysis.py
+python fm_cli.py
 ```
 
 默认读取 `config.json` 中保存的路径（默认 `~\Documents\Sports Interactive\Football Manager 2024\team.rtf`），结果写入 `fm_analysis.html`。
@@ -48,10 +48,11 @@ python fm_analysis.py
 ### 作为模块调用
 
 ```python
-import fm_analysis as fa
+from fm_roster import read_roster_from_rtf
+from fm_analysis import analyze
 
-roster = fa.read_roster_from_rtf(r"path\to\team.rtf")
-html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
+roster = read_roster_from_rtf(r"path\to\team.rtf")
+html = analyze(roster, growth_until_age=21, growth_per_year=20)
 ```
 
 ## 配置文件
@@ -84,9 +85,13 @@ html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
 ## 项目结构
 
 ```
-fm_analysis.py       核心逻辑：RTF 解析、EA 计算、阵容分配
-fm_report.py         HTML 报告渲染（从 templates/ 读取模板）
 fm_analysis_gui.py   tkinter 图形界面
+fm_cli.py            命令行入口
+fm_config.py         配置文件读写
+fm_positions.py      阵型槽位与位置解析
+fm_roster.py         RTF 阵容解析
+fm_analysis.py       核心逻辑：EA 计算、阵容分配、深度图
+fm_report.py         HTML 报告渲染（从 templates/ 读取模板）
 fm_analysis.html     生成的报告输出（被 gitignore 忽略）
 config.json          配置文件
 templates/style.css      报告样式表

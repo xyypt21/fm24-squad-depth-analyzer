@@ -40,7 +40,7 @@ In the window:
 ### Command line
 
 ```bash
-python fm_analysis.py
+python fm_cli.py
 ```
 
 Reads the path saved in `config.json` (default `~\Documents\Sports Interactive\Football Manager 2024\team.rtf`) and writes the result to `fm_analysis.html`.
@@ -48,10 +48,11 @@ Reads the path saved in `config.json` (default `~\Documents\Sports Interactive\F
 ### As a module
 
 ```python
-import fm_analysis as fa
+from fm_roster import read_roster_from_rtf
+from fm_analysis import analyze
 
-roster = fa.read_roster_from_rtf(r"path\to\team.rtf")
-html = fa.analyze(roster, growth_until_age=21, growth_per_year=20)
+roster = read_roster_from_rtf(r"path\to\team.rtf")
+html = analyze(roster, growth_until_age=21, growth_per_year=20)
 ```
 
 ## Configuration
@@ -84,11 +85,15 @@ The `能力` (Ability) column is exported twice (current/potential); the parser 
 ## Project Structure
 
 ```
-fm_analysis.py        Core logic: RTF parsing, EA calculation, lineup selection
-fm_report.py          HTML report rendering (reads templates from templates/)
-fm_analysis_gui.py    tkinter GUI
-fm_analysis.html      Generated report output (ignored by git)
-config.json           Configuration file
+fm_analysis_gui.py   tkinter GUI
+fm_cli.py            Command-line entry point
+fm_config.py         Config file loading/saving
+fm_positions.py      Formation slots and position parsing
+fm_roster.py         RTF roster parsing
+fm_analysis.py       Core logic: EA calculation, lineup selection, depth chart
+fm_report.py         HTML report rendering (reads templates from templates/)
+fm_analysis.html     Generated report output (ignored by git)
+config.json          Configuration file
 templates/style.css   Report stylesheet
 templates/report.html Report HTML skeleton (placeholder-based)
 ```
