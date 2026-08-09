@@ -1,8 +1,8 @@
 """
 FM2024 4-2-3-1 squad depth analysis core.
 
-Computes EA (Expected Ability) for every player, uses the Hungarian algorithm
-to pick the EA best and second-best starting XI, and builds the depth chart.
+Computes EA (Expected Ability) for every player and uses the Hungarian algorithm
+to pick the best and second-best starting XI for both CA and EA.
 
 EA (Expected Ability) = CA + growth potential
   age < growth_until_age  EA = CA + (growth_until_age - age) × growth_per_year

@@ -1,20 +1,10 @@
 """Formation slots and FM position parsing."""
 
 import re
-from typing import Dict, List, Set
+from typing import List, Set
 
 # 4-2-3-1 starting XI, ordered top-to-bottom as the pitch is drawn.
 SLOTS: List[str] = ["GK", "DL", "DC", "DC", "DR", "DMC", "DMC", "AML", "AMC", "AMR", "STC"]
-
-# Depth-chart slots: SLOTS is the 11-man formation (with repeated DC/DMC), whereas
-# the reinforcement scores and depth chart are grouped by *position*, so this map
-# translates a position into its indices in the 11-man lists. E.g. DEPTH_SLOT_MAP["DC"] == [2, 3]
-# means the two centre-backs sit at indices 2 and 3. DEPTH_SLOTS lists positions in
-# first-seen order.
-DEPTH_SLOT_MAP: Dict[str, List[int]] = {}
-for i, slot in enumerate(SLOTS):
-    DEPTH_SLOT_MAP.setdefault(slot, []).append(i)
-DEPTH_SLOTS: List[str] = list(DEPTH_SLOT_MAP)
 
 # Valid FM role names and side letters.
 VALID_ROLES: Set[str] = {"GK", "D", "WB", "DM", "M", "AM", "ST"}

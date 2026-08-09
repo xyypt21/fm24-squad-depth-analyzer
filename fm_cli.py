@@ -11,8 +11,9 @@ from fm_roster import read_squad_from_memory
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="FM24 阵容厚度分析（直接从游戏内存读取）")
-    ap.add_argument("--club", type=int, default=None,
-                    help="俱乐部 ID（默认取 config.json 的 club_uid）")
+    ap.add_argument(
+        "--club", type=int, default=None, help="俱乐部 ID（默认取 config.json 的 club_uid）"
+    )
     args = ap.parse_args()
 
     config = load_config()
@@ -35,4 +36,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -1,10 +1,11 @@
 """
 FM2024 4-2-3-1 squad depth analysis - HTML report rendering.
 
-Renders the analysis results as a visual HTML report (pitch diagrams + depth chart).
+Renders the analysis results as a visual HTML report with pitch diagrams.
 """
 
 from pathlib import Path
+
 
 def compute_average(xi, sort_key):
     """Compute the average score of a starting XI."""

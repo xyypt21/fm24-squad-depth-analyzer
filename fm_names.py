@@ -63,6 +63,7 @@ def _batch_translate(names):
 
     try:
         from deep_translator import GoogleTranslator
+
         # deep-translator 未设 socket 超时，代理不通会无限阻塞；设全局默认超时兜底
         _previous = socket.getdefaulttimeout()
         socket.setdefaulttimeout(_REQUEST_TIMEOUT)
@@ -70,10 +71,7 @@ def _batch_translate(names):
             # 复用同一个 translator（requests 内部复用连接），并发翻译
             translator = GoogleTranslator(source="auto", target="zh-CN", proxies=_proxies())
             with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
-                futs = {
-                    pool.submit(_translate_one, n, translator)
-                    for n in todo
-                }
+                futs = {pool.submit(_translate_one, n, translator) for n in todo}
                 for fut in futs:
                     name, cn = fut.result()
                     if cn:
@@ -91,12 +89,3 @@ def auto_translate(names):
     if not names:
         return {}
     return _batch_translate(names)
-
-
-def translate_name(name: str) -> str:
-    """把单个英文全名翻译成中文；翻译失败则原样返回。"""
-    if not name:
-        return name
-    return _batch_translate([name]).get(name, name)
-
-

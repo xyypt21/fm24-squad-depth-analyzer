@@ -17,7 +17,9 @@ FM24 内存探测工具 —— 在游戏运行时使用。
 """
 
 import argparse
+import contextlib
 import ctypes
+import datetime as _dt
 import glob
 import json
 import os
@@ -26,13 +28,11 @@ import tempfile
 from ctypes import wintypes as wt
 from pathlib import Path
 
-for stream in (sys.stdout, sys.stderr):
-    try:
-        stream.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
-
 from fm_memory import FmMemory
+
+for stream in (sys.stdout, sys.stderr):
+    with contextlib.suppress(Exception):
+        stream.reconfigure(encoding="utf-8")
 
 FM_DIR = Path(r"C:\Users\xyy\Documents\Sports Interactive\Football Manager 2024")
 
@@ -40,8 +40,7 @@ FM_DIR = Path(r"C:\Users\xyy\Documents\Sports Interactive\Football Manager 2024"
 # 年龄按"游戏内日期"计算，而非系统日期（否则会差约 3 岁）。
 # 与 FM Scouting Tool 一致：用游戏日期 + 精确周岁算法。
 # 游戏日期编码（相对 fm.exe 基址）：(年<<16) | 自 2004-10-10 起的天数。
-import datetime as _dt
-GAME_DATE_RVA = 0x631D5BC     # fm.exe 内游戏日期全局
+GAME_DATE_RVA = 0x631D5BC  # fm.exe 内游戏日期全局
 GAME_DATE_EPOCH = _dt.date(2004, 10, 10)
 # 兜底：读取失败时用的日期（当前存档 2023-07-17）
 GAME_DATE = _dt.date(2023, 7, 17)
@@ -100,54 +99,76 @@ def calc_age(birth_date):
 #       + 用 ctypes 对运行中的游戏复现验证。
 # 注意：这些偏移锁定当前 FM24 构建（Epic 版）。游戏更新后可能变化，
 #       若偏移失效，用同样手段重新观察即可。
-FM24_ENTRY_A = 0x642ED38   # [base+A] -> p2 ；[p2+0x80] -> p3
-FM24_ENTRY_A_NEXT = 0x80   # 从 p2 到 p3 的偏移
-FM24_ENTRY_B = 0x63659C0   # [base+B] -> q1 ；[q1+0x90] -> 版本探测值
+FM24_ENTRY_A = 0x642ED38  # [base+A] -> p2 ；[p2+0x80] -> p3
+FM24_ENTRY_A_NEXT = 0x80  # 从 p2 到 p3 的偏移
+FM24_ENTRY_B = 0x63659C0  # [base+B] -> q1 ；[q1+0x90] -> 版本探测值
 FM24_TABLE_STRIDE = 0x268  # 大表条目间距（读迹中 8 字节指针的间隔）
 
 # ── --roster 用：球员记录（1000 字节等距数组，实测验证）────────
 # 球员记录以特征签名 0x45A4E958 开头，间距固定 0x3E8（1000 字节）。
 # 记录内相对偏移（相对记录起始地址）：
-PLAYER_SIGNATURE = b"\x58\xE9\xA4\x45"      # 记录头 u32 = 0x45A4E958
+PLAYER_SIGNATURE = b"\x58\xe9\xa4\x45"  # 记录头 u32 = 0x45A4E958
 PLAYER_STRIDE = 0x3E8
-P_ENTITY_ID = 0x284          # +644  person_uid / entity_id
-P_CA = 0x200                 # +512  u16 当前能力
-P_PA = 0x202                 # +514  u16 潜在能力
-P_BIRTH_DOY = 0x2BC          # +700  u16 出生年内的第几天（1 起）
-P_BIRTH_YEAR = 0x2BE         # +702  u16 出生年
-P_NAME_FULL = 0x2C0          # +704  完整名串指针（可空）
-P_NAME_FIRST = 0x2D0         # +720  名持有者指针（->[0]->名串）
-P_NAME_LAST = 0x2D8          # +728  姓持有者指针（->[0]->姓串）
-P_CLUB_CUR = 0x130           # +304  当前俱乐部条目指针（56 字节条目, [+0xC]=uid）
+P_ENTITY_ID = 0x284  # +644  person_uid / entity_id
+P_CA = 0x200  # +512  u16 当前能力
+P_PA = 0x202  # +514  u16 潜在能力
+P_BIRTH_DOY = 0x2BC  # +700  u16 出生年内的第几天（1 起）
+P_BIRTH_YEAR = 0x2BE  # +702  u16 出生年
+P_NAME_FULL = 0x2C0  # +704  完整名串指针（可空）
+P_NAME_FIRST = 0x2D0  # +720  名持有者指针（->[0]->名串）
+P_NAME_LAST = 0x2D8  # +728  姓持有者指针（->[0]->姓串）
+P_CLUB_CUR = 0x130  # +304  当前俱乐部条目指针（56 字节条目, [+0xC]=uid）
 # 合同俱乐部：+832  -> S(180B) -> [S+0x10] -> 俱乐部条目(56B) -> [+0xC]=uid
-P_CONTRACT_S = 0x340         # +832  合同结构指针
+P_CONTRACT_S = 0x340  # +832  合同结构指针
 # 俱乐部条目（56 字节）：
 CLUB_ENTRY_TAG = 0x45A78848  # 条目头
-CLUB_ENTRY_UID = 0xC         # 条目内 club_uid
-CLUB_ENTRY_STRUCT = 0x30     # 条目内 -> 俱乐部结构
+CLUB_ENTRY_UID = 0xC  # 条目内 club_uid
+CLUB_ENTRY_STRUCT = 0x30  # 条目内 -> 俱乐部结构
 # 俱乐部结构（stride 0x100）：
-CLUB_STRUCT_UID = 0xC        # 结构内 club_uid
-CLUB_STRUCT_NAME = 0xC0      # 结构内 -> 名称缓冲([0]=len,[4]=串)
+CLUB_STRUCT_UID = 0xC  # 结构内 club_uid
+CLUB_STRUCT_NAME = 0xC0  # 结构内 -> 名称缓冲([0]=len,[4]=串)
 
 
 # ── 位置字段（相对球员记录，u8 熟练度 0-20，值 >= 15 视为天然位置）────
 # 来源：FM Scouting Tool 26 的 info.json 偏移表（同版本 FM 记录布局一致，
 #       name_nested 0x2C0/0x2D0/0x2D8 与本工具实测完全吻合，可交叉验证）。
-P_POS_BASE = 0x208            # 位置数组起始（15 个连续 u8）
-POS_ORDER = ["pos_gk", "pos_sw", "pos_dl", "pos_dc", "pos_dr", "pos_dm",
-             "pos_ml", "pos_mc", "pos_mr", "pos_aml", "pos_amc", "pos_amr",
-             "pos_st", "pos_wbl", "pos_wbr"]
+P_POS_BASE = 0x208  # 位置数组起始（15 个连续 u8）
+POS_ORDER = [
+    "pos_gk",
+    "pos_sw",
+    "pos_dl",
+    "pos_dc",
+    "pos_dr",
+    "pos_dm",
+    "pos_ml",
+    "pos_mc",
+    "pos_mr",
+    "pos_aml",
+    "pos_amc",
+    "pos_amr",
+    "pos_st",
+    "pos_wbl",
+    "pos_wbr",
+]
 # 每个槽 -> (角色, 侧别)。注意 pos_dm 是 DMC（防守中场居中），不是 D 加侧别 M。
 POS_ROLE_SIDE = {
-    "pos_gk": ("GK", None), "pos_sw": ("SW", None),
-    "pos_dl": ("D", "L"), "pos_dc": ("D", "C"), "pos_dr": ("D", "R"),
+    "pos_gk": ("GK", None),
+    "pos_sw": ("SW", None),
+    "pos_dl": ("D", "L"),
+    "pos_dc": ("D", "C"),
+    "pos_dr": ("D", "R"),
     "pos_dm": ("DM", "C"),
-    "pos_ml": ("M", "L"), "pos_mc": ("M", "C"), "pos_mr": ("M", "R"),
-    "pos_aml": ("AM", "L"), "pos_amc": ("AM", "C"), "pos_amr": ("AM", "R"),
+    "pos_ml": ("M", "L"),
+    "pos_mc": ("M", "C"),
+    "pos_mr": ("M", "R"),
+    "pos_aml": ("AM", "L"),
+    "pos_amc": ("AM", "C"),
+    "pos_amr": ("AM", "R"),
     "pos_st": ("ST", "C"),
-    "pos_wbl": ("WB", "L"), "pos_wbr": ("WB", "R"),
+    "pos_wbl": ("WB", "L"),
+    "pos_wbr": ("WB", "R"),
 }
-POS_NATURAL_MIN = 15           # 熟练度阈值：>=15 为"天然"位置（FM Scouting Tool 用 15）
+POS_NATURAL_MIN = 15  # 熟练度阈值：>=15 为"天然"位置（FM Scouting Tool 用 15）
 POS_ROLE_ORDER = ["GK", "SW", "D", "WB", "DM", "M", "AM", "ST"]
 POS_SIDE_ORDER = ["R", "L", "C"]
 
@@ -225,7 +246,11 @@ def run_chain(mem, exe_mod):
     print(f"[chain] fm.exe base = 0x{base:012X}")
 
     p2 = mem.read_ptr(base + FM24_ENTRY_A)
-    print(f"  [base+0x{FM24_ENTRY_A:X}] -> p2 = 0x{p2:012X}" if p2 else f"  [base+0x{FM24_ENTRY_A:X}] 读取失败")
+    print(
+        f"  [base+0x{FM24_ENTRY_A:X}] -> p2 = 0x{p2:012X}"
+        if p2
+        else f"  [base+0x{FM24_ENTRY_A:X}] 读取失败"
+    )
     if not p2:
         print("  偏移失效（游戏版本不匹配？）")
         return
@@ -239,10 +264,18 @@ def run_chain(mem, exe_mod):
     print(f"  [p3+8]    -> 第二表 = 0x{table2:012X}" if table2 else "  [p3+8] 读取失败")
 
     q1 = mem.read_ptr(base + FM24_ENTRY_B)
-    print(f"  [base+0x{FM24_ENTRY_B:X}] -> q1 = 0x{q1:012X}" if q1 else f"  [base+0x{FM24_ENTRY_B:X}] 读取失败")
+    print(
+        f"  [base+0x{FM24_ENTRY_B:X}] -> q1 = 0x{q1:012X}"
+        if q1
+        else f"  [base+0x{FM24_ENTRY_B:X}] 读取失败"
+    )
     if q1:
         q2 = mem.read_u32(q1 + 0x90)
-        print(f"  [q1+0x90] -> 版本探测 = {q2} (0x{q2:X})" if q2 is not None else "  [q1+0x90] 读取失败")
+        print(
+            f"  [q1+0x90] -> 版本探测 = {q2} (0x{q2:X})"
+            if q2 is not None
+            else "  [q1+0x90] 读取失败"
+        )
 
     if table:
         print(f"  大表头 8 项（间距 0x{FM24_TABLE_STRIDE:X}）:")
@@ -266,7 +299,7 @@ def _read_len_str(mem, ptr):
             return None
         ln = int.from_bytes(b[0:4], "little")
         if 0 < ln < 120:
-            raw = b[4:4 + ln]
+            raw = b[4 : 4 + ln]
             if all(32 <= c < 127 or c > 0x7F for c in raw):
                 return raw.decode("utf-8", "replace")
         v = int.from_bytes(b[0:8], "little")
@@ -288,7 +321,7 @@ def _club_entry_uid(mem, ptr):
         return None
     if int.from_bytes(b[0:4], "little") != CLUB_ENTRY_TAG:
         return None
-    return int.from_bytes(b[CLUB_ENTRY_UID:CLUB_ENTRY_UID + 4], "little")
+    return int.from_bytes(b[CLUB_ENTRY_UID : CLUB_ENTRY_UID + 4], "little")
 
 
 def _club_parent(mem, ptr):
@@ -305,11 +338,11 @@ def _club_parent(mem, ptr):
     if int.from_bytes(b[0:4], "little") != CLUB_ENTRY_TAG:
         return None
     # 条目内指针均为 64 位（游戏堆可能在 4GB 以上），不能按 u32 截断读
-    cs = int.from_bytes(b[CLUB_ENTRY_STRUCT:CLUB_ENTRY_STRUCT + 8], "little")
+    cs = int.from_bytes(b[CLUB_ENTRY_STRUCT : CLUB_ENTRY_STRUCT + 8], "little")
     st = mem.read_bytes(cs, 0x14) if cs else None
     if not st or len(st) < 0x14:
         return None
-    return int.from_bytes(st[CLUB_STRUCT_UID:CLUB_STRUCT_UID + 4], "little")
+    return int.from_bytes(st[CLUB_STRUCT_UID : CLUB_STRUCT_UID + 4], "little")
 
 
 def _club_name(mem, club_entry):
@@ -320,13 +353,13 @@ def _club_name(mem, club_entry):
     if not b or len(b) < 0x40:
         return None
     # 条目/结构内指针均为 64 位，不能按 u32 截断读
-    cs = int.from_bytes(b[CLUB_ENTRY_STRUCT:CLUB_ENTRY_STRUCT + 8], "little")
+    cs = int.from_bytes(b[CLUB_ENTRY_STRUCT : CLUB_ENTRY_STRUCT + 8], "little")
     if not cs:
         return None
     st = mem.read_bytes(cs, CLUB_STRUCT_NAME + 8)
     if not st or len(st) < CLUB_STRUCT_NAME + 8:
         return None
-    np = int.from_bytes(st[CLUB_STRUCT_NAME:CLUB_STRUCT_NAME + 8], "little")
+    np = int.from_bytes(st[CLUB_STRUCT_NAME : CLUB_STRUCT_NAME + 8], "little")
     return _read_len_str(mem, np)
 
 
@@ -358,11 +391,8 @@ def _cached_segments(mem):
 
 
 def _save_segment_cache(mem, segs):
-    try:
-        _REC_CACHE_PATH.write_text(
-            json.dumps({"pid": mem.pid, "segments": segs}), encoding="utf-8")
-    except Exception:
-        pass
+    with contextlib.suppress(Exception):
+        _REC_CACHE_PATH.write_text(json.dumps({"pid": mem.pid, "segments": segs}), encoding="utf-8")
 
 
 def scan_player_segments(mem):
@@ -404,10 +434,10 @@ def read_player(mem, rec, raw=None):
         return None
 
     def _u64(off):
-        return int.from_bytes(raw[off:off + 8], "little")
+        return int.from_bytes(raw[off : off + 8], "little")
 
     def _u16(off):
-        return int.from_bytes(raw[off:off + 2], "little")
+        return int.from_bytes(raw[off : off + 2], "little")
 
     full = _read_len_str(mem, _u64(P_NAME_FULL))
     first = _read_len_str(mem, _u64(P_NAME_FIRST))
@@ -432,7 +462,7 @@ def read_player(mem, rec, raw=None):
     # 位置：15 个 u8 熟练度从 raw 直接切（一次读完整条记录，避免 15 次 syscall）
     pos_values = [raw[P_POS_BASE + i] for i in range(15)]
     return {
-        "entity_id": int.from_bytes(raw[P_ENTITY_ID:P_ENTITY_ID + 4], "little"),
+        "entity_id": int.from_bytes(raw[P_ENTITY_ID : P_ENTITY_ID + 4], "little"),
         "name": name,
         "ca": ca,
         "pa": pa,
@@ -444,26 +474,6 @@ def read_player(mem, rec, raw=None):
         "club_entry": club_entry,
         "rec": rec,
     }
-
-
-def doy_to_date(year, doy):
-    try:
-        import datetime
-        return (datetime.date(year, 1, 1) + datetime.timedelta(days=doy - 1)).isoformat()
-    except Exception:
-        return f"{year}-{doy}"
-
-
-def collect_roster(mem):
-    """扫描并解析所有有俱乐部合同的球员，返回 player dict 列表。"""
-    segs = scan_player_segments(mem)
-    players = []
-    for r, raw in _iter_record_raws(mem, segs):
-        p = read_player(mem, r, raw)
-        if p["contract"] is None:
-            continue
-        players.append(p)
-    return players
 
 
 def _record_segments(recs):
@@ -495,7 +505,7 @@ def _iter_record_raws(mem, segs):
             continue
         for i in range(count):
             rec = start + i * PLAYER_STRIDE
-            yield rec, buf[i * PLAYER_STRIDE: i * PLAYER_STRIDE + 0x348]
+            yield rec, buf[i * PLAYER_STRIDE : i * PLAYER_STRIDE + 0x348]
 
 
 def _contract_uid(mem, raw, cache=None):
@@ -507,7 +517,7 @@ def _contract_uid(mem, raw, cache=None):
     """
     if not raw or len(raw) < P_CONTRACT_S + 8:
         return None
-    s_ptr = int.from_bytes(raw[P_CONTRACT_S:P_CONTRACT_S + 8], "little")
+    s_ptr = int.from_bytes(raw[P_CONTRACT_S : P_CONTRACT_S + 8], "little")
     if not s_ptr:
         return None
     s = mem.read_bytes(s_ptr, 0x18)
@@ -522,32 +532,6 @@ def _contract_uid(mem, raw, cache=None):
     if cache is not None:
         cache[s10] = uid
     return uid
-
-
-def collect_roster_for_club(mem, club_uid):
-    """扫描全量球员并按合同俱乐部过滤，返回该队球员 dict 列表（含名字解析）。
-
-    供 CLI / GUI 从内存直读阵容（替代 RTF 导出）使用。
-    优化：先走便宜路径只解析合同 uid（段内批量读 + 缓存），
-    仅对命中俱乐部的记录做完整解析（名字/位置）。
-    只算自有球员：合同队与当前队都 == club_uid（排除外租及租入）。
-    """
-    segs = scan_player_segments(mem)
-    cache = {}
-    cur_cache = {}
-    matches = []
-    for r, raw in _iter_record_raws(mem, segs):
-        if _contract_uid(mem, raw, cache) != club_uid:
-            continue
-        if _current_uid(mem, raw, cur_cache) != club_uid:
-            continue
-        matches.append((r, raw))
-    roster = []
-    for r, raw in matches:
-        p = read_player(mem, r, raw)
-        if p:
-            roster.append(p)
-    return roster
 
 
 def club_name(mem, club_uid):
@@ -576,7 +560,7 @@ def _current_uid(mem, raw, cache=None):
     """
     if not raw or len(raw) < P_CLUB_CUR + 8:
         return None
-    entry = int.from_bytes(raw[P_CLUB_CUR:P_CLUB_CUR + 8], "little")
+    entry = int.from_bytes(raw[P_CLUB_CUR : P_CLUB_CUR + 8], "little")
     if not entry:
         return None
     if cache is not None and entry in cache:
@@ -617,14 +601,14 @@ def club_squad(mem, club_uid):
 def _print_club_summary(mem, players):
     """输出所有俱乐部的球员数量汇总。"""
     import collections
+
     club_names = {}
     for p in players:
         if p["club_entry"]:
             club_names.setdefault(p["contract"], _club_name(mem, p["club_entry"]))
     counts = collections.Counter(p["contract"] for p in players)
     print("\n[roster] 全部俱乐部球员数（前 40，uid/名字/人数）:")
-    rows = sorted(((uid, club_names.get(uid), c) for uid, c in counts.items()),
-                  key=lambda x: -x[2])
+    rows = sorted(((uid, club_names.get(uid), c) for uid, c in counts.items()), key=lambda x: -x[2])
     for uid, name, c in rows[:40]:
         print(f"    {uid:>10}  {c:>4}  {name or '?'}")
     print(f"\n    共 {len(counts)} 家俱乐部。要找自己的俱乐部 uid 后加 --club <uid>。")
@@ -657,7 +641,7 @@ def run_roster(mem, club_uid):
     print(f"\n[roster] 俱乐部 {club_uid} {club_names.get(club_uid) or '?'} 球员 {len(mine)} 人：")
     print(f"    {'姓名':<22}{'年龄':>4}{'位置':<22}{'CA':>4}{'PA':>4}  {'状态'}")
     for p in mine:
-        loan = (p["current"] is not None and p["current"] != club_uid)
+        loan = p["current"] is not None and p["current"] != club_uid
         age = None
         if p["year"] and 1900 < p["year"] < 2100:
             try:
@@ -666,8 +650,10 @@ def run_roster(mem, club_uid):
             except Exception:
                 age = None
         status = f"租出->{p['current']}" if loan else ""
-        print(f"    {str(p['name'] or '?')[:22]:<22}{str(age or '-'):>4}"
-              f"{(p['position'] or '-')[:22]:<22}{p['ca'] or '-':>4}{p['pa'] or '-':>4}  {status}")
+        print(
+            f"    {str(p['name'] or '?')[:22]:<22}{str(age or '-'):>4}"
+            f"{(p['position'] or '-')[:22]:<22}{p['ca'] or '-':>4}{p['pa'] or '-':>4}  {status}"
+        )
     n_loan = sum(1 for p in mine if p["current"] is not None and p["current"] != club_uid)
     n_here = len(mine) - n_loan
     print(f"\n    在队 {n_here} 人，租出 {n_loan} 人。")
@@ -682,9 +668,12 @@ def file_version(path):
     version_dll.GetFileVersionInfoW.restype = wt.BOOL
     version_dll.GetFileVersionInfoW.argtypes = [wt.LPCWSTR, wt.DWORD, wt.DWORD, ctypes.c_void_p]
     version_dll.VerQueryValueW.restype = wt.BOOL
-    version_dll.VerQueryValueW.argtypes = [ctypes.c_void_p, wt.LPCWSTR,
-                                           ctypes.POINTER(ctypes.c_void_p),
-                                           ctypes.POINTER(wt.UINT)]
+    version_dll.VerQueryValueW.argtypes = [
+        ctypes.c_void_p,
+        wt.LPCWSTR,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.POINTER(wt.UINT),
+    ]
 
     if not os.path.isfile(path):
         return None
@@ -705,8 +694,9 @@ def file_version(path):
         fixed = f"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}.{ls & 0xFFFF}"
 
     product = ""
-    if version_dll.VerQueryValueW(buf, "\\StringFileInfo\\040904b0\\ProductVersion",
-                                  ctypes.byref(ptr), ctypes.byref(ln)):
+    if version_dll.VerQueryValueW(
+        buf, "\\StringFileInfo\\040904b0\\ProductVersion", ctypes.byref(ptr), ctypes.byref(ln)
+    ):
         try:
             product = ctypes.wstring_at(ptr.value, ln.value).split("\x00")[0]
         except Exception:
@@ -715,17 +705,62 @@ def file_version(path):
 
 
 # ── 主流程 ─────────────────────────────────────────────
+def _anchor_texts(args):
+    """确定要查找的锚点字符串列表。"""
+    if args.name:
+        return [args.name]
+    saves = sorted(glob.glob(str(FM_DIR / "games" / "*.fm")), key=os.path.getmtime, reverse=True)
+    anchor = Path(saves[0]).stem if saves else None
+    print(f"    [自动] 最新存档名: {anchor}")
+    anchors = [anchor] if anchor else []
+    anchors.extend(("Football Manager", "footballmanager"))
+    return anchors
+
+
+def _scan_anchors(mem, texts):
+    """在内存中逐个查找锚点字符串并打印命中地址。"""
+    for text in texts:
+        print(f"[4] 内存查找锚点: {text!r}")
+        hits = mem.find_utf16(text, max_hits=8)
+        if hits:
+            print(f"    命中 {len(hits)} 处:")
+            for h in hits[:8]:
+                print(f"      0x{h:012X}")
+        else:
+            print("    未命中（尝试用 --name 指定球员名/俱乐部名）")
+
+
+def _memory_summary(mem):
+    """输出已提交可读内存区域概况（估算数据存放区）。"""
+    print("[5] 已提交内存区域概况 ...")
+    total = 0
+    biggest = []
+    for addr, size in mem.iter_regions():
+        total += size
+        biggest.append((size, addr))
+    biggest.sort(reverse=True)
+    print(f"    已提交可读区域合计 {total / 1024 / 1024:.1f} MB")
+    print("    最大的几个区域（可能是游戏数据区）:")
+    for size, addr in biggest[:5]:
+        print(f"      0x{addr:012X}  size=0x{size:X} ({size / 1024 / 1024:.1f} MB)")
+
+
 def main():
     ap = argparse.ArgumentParser(description="FM24 内存探测")
-    ap.add_argument("--name", default=None,
-                    help="要在内存里查找的锚点字符串（默认：最新存档名）")
+    ap.add_argument("--name", default=None, help="要在内存里查找的锚点字符串（默认：最新存档名）")
     ap.add_argument("--module", action="store_true", help="只列模块不扫描")
-    ap.add_argument("--chain", action="store_true",
-                    help="复现已验证的入口指针链（游戏基址->数据大表）")
-    ap.add_argument("--roster", action="store_true",
-                    help="枚举球员记录并输出名单（可加 --club 过滤）")
-    ap.add_argument("--club", type=int, default=None,
-                    help="与 --roster 配合：只显示该俱乐部(uid)的球员；不填则输出俱乐部汇总")
+    ap.add_argument(
+        "--chain", action="store_true", help="复现已验证的入口指针链（游戏基址->数据大表）"
+    )
+    ap.add_argument(
+        "--roster", action="store_true", help="枚举球员记录并输出名单（可加 --club 过滤）"
+    )
+    ap.add_argument(
+        "--club",
+        type=int,
+        default=None,
+        help="与 --roster 配合：只显示该俱乐部(uid)的球员；不填则输出俱乐部汇总",
+    )
     args = ap.parse_args()
 
     # 1. 附加
@@ -771,46 +806,12 @@ def main():
             return
 
         # 4. 锚点字符串
-        if args.name:
-            anchors = [args.name]
-        else:
-            saves = sorted(glob.glob(str(FM_DIR / "games" / "*.fm")),
-                           key=os.path.getmtime, reverse=True)
-            anchor = Path(saves[0]).stem if saves else None
-            anchors = [anchor] if anchor else []
-            print(f"    [自动] 最新存档名: {anchor}")
-            if args.name:
-                anchors.append(args.name)
-            else:
-                anchors.append("Football Manager")
-                anchors.append("footballmanager")
-
-        for text in anchors:
-            print(f"[4] 内存查找锚点: {text!r}")
-            hits = mem.find_utf16(text, max_hits=8)
-            if hits:
-                print(f"    命中 {len(hits)} 处:")
-                for h in hits[:8]:
-                    print(f"      0x{h:012X}")
-            else:
-                print("    未命中（尝试用 --name 指定球员名/俱乐部名）")
-
+        _scan_anchors(mem, _anchor_texts(args))
         # 5. 大模块内存概况（估算数据存放区）
-        print("[5] 已提交内存区域概况 ...")
-        total = 0
-        biggest = []
-        for addr, size in mem.iter_regions():
-            total += size
-            biggest.append((size, addr))
-        biggest.sort(reverse=True)
-        print(f"    已提交可读区域合计 {total / 1024 / 1024:.1f} MB")
-        print("    最大的几个区域（可能是游戏数据区）:")
-        for size, addr in biggest[:5]:
-            print(f"      0x{addr:012X}  size=0x{size:X} ({size / 1024 / 1024:.1f} MB)")
+        _memory_summary(mem)
 
     print("\n完成。下一步用找到的锚点地址做结构定位（见注释）。")
 
 
 if __name__ == "__main__":
     main()
-
