@@ -29,6 +29,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "growth_until_age": 21,
     "growth_per_year": 20,
     "translate_names": False,
+    "merge_club2": False,
+    "club2_uid": 0,
 }
 
 
@@ -47,6 +49,8 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
         "growth_until_age": int(merged["growth_until_age"]),
         "growth_per_year": int(merged["growth_per_year"]),
         "translate_names": bool(merged["translate_names"]),
+        "merge_club2": bool(merged["merge_club2"]),
+        "club2_uid": int(merged["club2_uid"]),
     }
 
 

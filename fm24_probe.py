@@ -602,6 +602,45 @@ def club_squad(mem, club_uid):
     return name, matches
 
 
+def merged_squad(mem, club1, club2):
+    """一次全内存扫描，返回合并两支球队的球员列表（及两队队名）。
+
+    用途：把 club1 的自有球员与"租借到 club2 的 club1 球员"算作同一支
+    队伍的阵容。规则（全部取父俱乐部 uid 归一化后比较）：
+      - club1 自有：  contract == club1 且 current == club1
+      - 租到 club2：  contract == club1 且 current == club2
+      - club2 自有：  contract == club2 且 current == club2
+    其余情况全部排除（尤其 contract == club1 但 current == 其他俱乐部
+    的，即"租出到其他俱乐部"）。
+    返回 (club1_name, club2_name, players)，players 为全量球员 dict。
+    """
+    segs = scan_player_segments(mem)
+    cache = {}
+    cur_cache = {}
+    players = []
+    name1 = name2 = None
+    for r, raw in _iter_record_raws(mem, segs):
+        contract = _contract_uid(mem, raw, cache)
+        current = _current_uid(mem, raw, cur_cache)
+        if contract == club1:
+            if current != club1 and current != club2:
+                continue
+            own = 0
+        elif contract == club2 and current == club2:
+            own = 1
+        else:
+            continue
+        p = read_player(mem, r, raw)
+        if not p:
+            continue
+        players.append(p)
+        if own == 0 and name1 is None and p["club_entry"]:
+            name1 = _club_name(mem, p["club_entry"])
+        if own == 1 and name2 is None and p["club_entry"]:
+            name2 = _club_name(mem, p["club_entry"])
+    return name1, name2, players
+
+
 def _print_club_summary(mem, players):
     """输出所有俱乐部的球员数量汇总。"""
     import collections

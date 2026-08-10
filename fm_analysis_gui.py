@@ -12,7 +12,10 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from fm_analysis import OUTPUT, analyze, load_config, save_config
-from fm_roster import club_name_from_memory, read_squad_from_memory
+from fm_roster import (
+    read_merged_squad_from_memory,
+    read_squad_from_memory,
+)
 
 
 class FmGui:
@@ -32,12 +35,7 @@ class FmGui:
         club_row = ttk.Frame(frm)
         club_row.grid(row=0, column=0, columnspan=3, sticky="ew", **pad)
         ttk.Label(club_row, text="俱乐部 ID:").pack(side="left")
-        ttk.Entry(club_row, textvariable=self.club_var, width=10).pack(side="left", padx=(0, 10))
-        self.club_name_var = tk.StringVar(value="")
-        self.fetch_name_btn = ttk.Button(club_row, text="查询名字", command=self.fetch_club_name)
-        self.fetch_name_btn.pack(side="left")
-        self.club_name_lbl = ttk.Label(club_row, textvariable=self.club_name_var, foreground="#555")
-        self.club_name_lbl.pack(side="left", padx=8)
+        ttk.Entry(club_row, textvariable=self.club_var, width=10).pack(side="left")
 
         ea_row = ttk.Frame(frm)
         ea_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
@@ -58,32 +56,45 @@ class FmGui:
             side="left"
         )
 
+        club2_row = ttk.Frame(frm)
+        club2_row.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
+        self.compare_var = tk.BooleanVar(value=bool(self._config.get("merge_club2", False)))
+        self.club2_var = tk.StringVar(
+            value=str(self._config.get("club2_uid", 0) or 0) if self._config.get("club2_uid") else ""
+        )
+        ttk.Checkbutton(
+            club2_row, text="合并第二俱乐部", variable=self.compare_var, command=self._toggle_club2
+        ).pack(side="left")
+        self.club2_entry = ttk.Entry(club2_row, textvariable=self.club2_var, width=10)
+        self.club2_entry.pack(side="left", padx=(4, 10))
+        self._refresh_club2_state()
+
         self.formula_var = tk.StringVar()
         ttk.Label(frm, textvariable=self.formula_var, foreground="#555", justify="left").grid(
-            row=3, column=0, columnspan=3, sticky="w", **pad
+            row=4, column=0, columnspan=3, sticky="w", **pad
         )
         self._update_formula()
         self.ea_age_var.trace_add("write", lambda *_: self._update_formula())
         self.ea_growth_var.trace_add("write", lambda *_: self._update_formula())
 
         btn_row = ttk.Frame(frm)
-        btn_row.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
+        btn_row.grid(row=5, column=0, columnspan=3, sticky="ew", **pad)
         self.run_btn = ttk.Button(btn_row, text="开始分析", command=self.start_analysis)
         self.run_btn.pack(side="left")
         ttk.Button(btn_row, text="退出", command=root.destroy).pack(side="right")
 
         self.log = tk.Text(frm, height=14, state="disabled", wrap="word")
-        self.log.grid(row=5, column=0, columnspan=3, sticky="nsew", **pad)
+        self.log.grid(row=6, column=0, columnspan=3, sticky="nsew", **pad)
         scroll = ttk.Scrollbar(frm, command=self.log.yview)
-        scroll.grid(row=5, column=3, sticky="ns")
+        scroll.grid(row=6, column=3, sticky="ns")
         self.log.configure(yscrollcommand=scroll.set)
 
         frm.columnconfigure(1, weight=1)
-        frm.rowconfigure(5, weight=1)
+        frm.rowconfigure(6, weight=1)
 
         self.status = tk.StringVar(value="就绪")
         ttk.Label(frm, textvariable=self.status).grid(
-            row=6, column=0, columnspan=3, sticky="w", **pad
+            row=7, column=0, columnspan=3, sticky="w", **pad
         )
 
     def log_line(self, text):
@@ -104,29 +115,12 @@ class FmGui:
     def _get_club_uid(self):
         return int(self.club_var.get())
 
-    def fetch_club_name(self):
-        try:
-            club_uid = self._get_club_uid()
-        except ValueError:
-            messagebox.showerror("错误", "俱乐部 ID 必须是整数。")
-            return
-        self.fetch_name_btn.configure(state="disabled")
-        self.status.set("查询中...")
-        thread = threading.Thread(target=self._fetch_name, args=(club_uid,), daemon=True)
-        thread.start()
+    def _refresh_club2_state(self):
+        """按复选框启用/禁用第二俱乐部输入控件。"""
+        self.club2_entry.configure(state="normal" if self.compare_var.get() else "disabled")
 
-    def _fetch_club_name(self, club_uid):
-        try:
-            name = club_name_from_memory(club_uid)
-            text = f"俱乐部 {club_uid}: {name}" if name else f"未找到俱乐部 {club_uid}"
-        except Exception as exc:
-            text = f"查询失败: {exc}"
-        self.root.after(0, self._on_name_fetched, text)
-
-    def _on_name_fetched(self, text):
-        self.club_name_var.set(text)
-        self.fetch_name_btn.configure(state="normal")
-        self.status.set("就绪")
+    def _toggle_club2(self):
+        self._refresh_club2_state()
 
     def open_result(self):
         path = OUTPUT
@@ -148,6 +142,19 @@ class FmGui:
         except ValueError:
             messagebox.showerror("错误", "参数必须是正整数（每年成长可为 0）。")
             return
+
+        club2_uid = None
+        if self.compare_var.get():
+            raw = self.club2_var.get().strip()
+            if raw:
+                try:
+                    club2_uid = int(raw)
+                    if club2_uid <= 0:
+                        raise ValueError
+                except ValueError:
+                    messagebox.showerror("错误", "第二俱乐部 ID 必须是正整数。")
+                    return
+
         save_config(
             {
                 "club_uid": club_uid,
@@ -155,26 +162,53 @@ class FmGui:
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
                 "translate_names": self.translate_var.get(),
+                "merge_club2": bool(self.compare_var.get()),
+                "club2_uid": club2_uid or 0,
             }
         )
         self.run_btn.configure(state="disabled")
         self.status.set("分析中...")
         self.log_line("-" * 40)
-        self.log_line(f"俱乐部 ID: {club_uid}")
+        self.log_line(
+            f"俱乐部 ID: {club_uid}" + (f"，合并第二俱乐部 {club2_uid}" if club2_uid else "")
+        )
         self.log_line(
             f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
         )
         self.log_line(f"翻译球员名字: {'开启' if self.translate_var.get() else '关闭'}")
         thread = threading.Thread(
             target=self._analyze,
-            args=(club_uid, min_age, growth_until_age, growth_per_year, self.translate_var.get()),
+            args=(
+                club_uid,
+                club2_uid,
+                min_age,
+                growth_until_age,
+                growth_per_year,
+                self.translate_var.get(),
+            ),
             daemon=True,
         )
         thread.start()
 
-    def _analyze(self, club_uid, min_age, growth_until_age, growth_per_year, translate):
+    def _analyze(self, club_uid, club2_uid, min_age, growth_until_age, growth_per_year, translate):
         try:
-            name, roster = read_squad_from_memory(club_uid)
+            name2 = None
+            if club2_uid is None:
+                name, roster = read_squad_from_memory(club_uid)
+                club_text = f"{club_uid}{(' ' + name) if name else ''}"
+                detail = f" 共 {len(roster)} 名球员"
+            else:
+                name1, name2, roster = read_merged_squad_from_memory(club_uid, club2_uid)
+                club_text = (
+                    f"{club_uid}{(' ' + name1) if name1 else ''} + "
+                    f"{club2_uid}{(' ' + name2) if name2 else ''}"
+                )
+                detail = f" 合并后共 {len(roster)} 名球员"
+            # 把第二俱乐部的设置记进 config，下次启动时回填
+            cfg = load_config()
+            cfg["merge_club2"] = club2_uid is not None
+            cfg["club2_uid"] = club2_uid or 0
+            save_config(cfg)
             html = analyze(
                 roster,
                 output=OUTPUT,
@@ -184,8 +218,7 @@ class FmGui:
                 translate=translate,
             )
             if html:
-                club = f"{club_uid}{(' ' + name) if name else ''}"
-                message = f"完成：俱乐部 {club} 共 {len(roster)} 名球员，结果已写入 {OUTPUT}"
+                message = f"完成：{club_text}{detail}，结果已写入 {OUTPUT}"
             else:
                 message = "未读到阵容数据，请确认游戏已运行且俱乐部 ID 正确。"
         except Exception as exc:

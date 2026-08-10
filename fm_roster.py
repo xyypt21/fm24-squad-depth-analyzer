@@ -3,7 +3,7 @@
 import datetime
 from typing import Optional
 
-from fm24_probe import calc_age, club_name, club_squad, refresh_game_date
+from fm24_probe import calc_age, club_name, club_squad, merged_squad, refresh_game_date
 from fm_memory import FmMemory
 
 
@@ -36,9 +36,22 @@ def _to_roster(players):
     return roster
 
 
+def read_merged_squad_from_memory(club1: int, club2: int) -> tuple:
+    """一次扫描返回 (club1_name, club2_name, roster)。
+
+    合并规则见 fm24_probe.merged_squad：club1 自有球员 + 租到 club2 的
+    club1 球员 + club2 自有球员；租到其他俱乐部的排除。
+    """
+    mem = FmMemory.attach(r"^(fm|footballmanager)\.exe$")
+    with mem:
+        refresh_game_date(mem)
+        name1, name2, players = merged_squad(mem, club1, club2)
+    return name1, name2, _to_roster(players)
+
+
 def read_squad_from_memory(club_uid: int) -> tuple:
     """
-    一次扫描返回 (队名, roster)。CLI/GUI 主入口（避免名字+阵容各扫一遍全内存）。
+    一次扫描返回 (队名, roster)。CLI 主入口（避免名字+阵容各扫一遍全内存）。
     """
     mem = FmMemory.attach(r"^(fm|footballmanager)\.exe$")
     with mem:
