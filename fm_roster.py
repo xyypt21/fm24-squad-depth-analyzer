@@ -3,8 +3,14 @@
 import datetime
 from typing import Optional
 
+import fm24_probe
 from fm24_probe import calc_age, club_name, club_squad, merged_squad, refresh_game_date
 from fm_memory import FmMemory
+
+
+def get_game_date():
+    """返回最近一次 refresh_game_date 后的游戏内日期（datetime.date 或 None）。"""
+    return fm24_probe.GAME_DATE
 
 
 def calc_age_from_ymd(year, doy):

@@ -36,18 +36,29 @@ for stream in (sys.stdout, sys.stderr):
 
 FM_DIR = Path(r"C:\Users\xyy\Documents\Sports Interactive\Football Manager 2024")
 
-# ── 游戏内当前日期 ─────────────────────────────────────────
+# ── 游戏内当前日期/时间 ────────────────────────────────────
 # 年龄按"游戏内日期"计算，而非系统日期（否则会差约 3 岁）。
 # 与 FM Scouting Tool 一致：用游戏日期 + 精确周岁算法。
-# 游戏日期编码（相对 fm.exe 基址）：(年<<16) | 自 2004-10-10 起的天数。
+# 游戏日期编码（2026-08-10 由实机数据确认）：
+#   u32 = (年 << 16) | (时间字节 << 8) | 年内第几天(低8位)
+#   时间字节 bit0 = doy 进位（第 256 天标志），bit1-7 才是时间。
+#   - doy  = (v & 0xFF) + ((v >> 8) & 1) * 256
+#   - 时间 = ((v >> 8) & 0xFE) 字节，8 单位/小时，分钟 = (字节+46)*7.5
+#   例：0x07E71AE7 -> 年2023, bit0=0, 时间0x1A -> 08-19 09:00。
+#   例：0x07E70330 -> 年2023, bit0=1, doy=48+256=304, 时间0x02 -> 10-31 06:00。
 GAME_DATE_RVA = 0x631D5BC  # fm.exe 内游戏日期全局
-GAME_DATE_EPOCH = _dt.date(2004, 10, 10)
-# 兜底：读取失败时用的日期（当前存档 2023-07-17）
-GAME_DATE = _dt.date(2023, 7, 17)
+GAME_DATE_TIME_OFF = 46  # 时间字节偏移：t = 分钟数/7.5 - 46
+GAME_DATE_UNIT_MIN = 7.5  # 1 单位 = 7.5 分钟
+# 游戏内日期全局；读取成功后才设置，未读取/失败保持 None（不用硬编码兜底）
+GAME_DATE = None
 
 
-def read_game_date(mem):
-    """从游戏内存读当前日期（fm.exe 基址 + GAME_DATE_RVA）。失败返回 None。"""
+def read_game_datetime(mem):
+    """从游戏内存读当前日期+时间：fm.exe 基址 + GAME_DATE_RVA。
+
+    编码：(年<<16)|(时间字节<<8)|doy低8位；时间字节 bit0 为 doy 进位。
+    返回 datetime.datetime；失败返回 None。
+    """
     try:
         mods = mem.modules()
         exe = next((m for m in mods if m[2].lower().endswith(".exe")), None)
@@ -57,21 +68,29 @@ def read_game_date(mem):
         if v is None:
             return None
         year = v >> 16
-        days = v & 0xFFFF
-        d = GAME_DATE_EPOCH + _dt.timedelta(days=days)
-        if 2000 <= year <= 2100 and d.year == year:
-            return d
-        return None
+        tb = (v >> 8) & 0xFF  # 时间字节
+        doy = (v & 0xFF) + (tb & 1) * 256  # 低8位 + 进位标志
+        time_unit = tb & 0xFE  # bit1-7 是时间
+        d = _dt.date(year, 1, 1) + _dt.timedelta(days=doy - 1)
+        if not (2000 <= year <= 2100 and 1 <= doy <= 366 and d.year == year):
+            return None
+        mins = int(round((time_unit + GAME_DATE_TIME_OFF) * GAME_DATE_UNIT_MIN))
+        hour, minute = divmod(mins, 60)
+        return _dt.datetime.combine(d, _dt.time(hour % 24, minute))
     except Exception:
         return None
 
 
+def read_game_date(mem):
+    """从游戏内存读当前日期（含时间截断到日期）。失败返回 None。"""
+    dtm = read_game_datetime(mem)
+    return dtm.date() if dtm else None
+
+
 def refresh_game_date(mem):
-    """用游戏内存日期更新全局 GAME_DATE；读取失败则保持原值。"""
+    """用游戏内存日期更新全局 GAME_DATE；读取失败则置为 None。"""
     global GAME_DATE
-    d = read_game_date(mem)
-    if d is not None:
-        GAME_DATE = d
+    GAME_DATE = read_game_date(mem)
     return GAME_DATE
 
 
@@ -86,6 +105,8 @@ def calc_age(birth_date):
     if not birth_date:
         return None
     try:
+        if GAME_DATE is None:
+            return None
         age = GAME_DATE.year - birth_date.year
         if (GAME_DATE.month, GAME_DATE.day) < (birth_date.month, birth_date.day):
             age -= 1
@@ -814,7 +835,7 @@ def main():
 
         # 读取游戏内当前日期（决定年龄计算基准）
         d = refresh_game_date(mem)
-        print(f"    游戏日期: {d or '读取失败'}" + ("" if d else f"（沿用默认 {GAME_DATE}）"))
+        print(f"    游戏日期: {d or '读取失败'}")
 
         # 2. 模块
         print("[2] 模块信息 ...")

@@ -13,6 +13,7 @@ from tkinter import messagebox, ttk
 
 from fm_analysis import OUTPUT, analyze, load_config, save_config
 from fm_roster import (
+    get_game_date,
     read_merged_squad_from_memory,
     read_squad_from_memory,
 )
@@ -204,6 +205,9 @@ class FmGui:
                     f"{club2_uid}{(' ' + name2) if name2 else ''}"
                 )
                 detail = f" 合并后共 {len(roster)} 名球员"
+            # 日志：当前游戏日期（读阵容时已刷新）
+            _gd = get_game_date()
+            self.log_line(f"游戏日期: {_gd.isoformat() if _gd else '读取失败'}")
             # 把第二俱乐部的设置记进 config，下次启动时回填
             cfg = load_config()
             cfg["merge_club2"] = club2_uid is not None
