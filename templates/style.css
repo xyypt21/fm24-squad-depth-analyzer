@@ -30,13 +30,21 @@ html,body { height:100%; font-family:"Microsoft YaHei","Segoe UI",sans-serif; ba
 .col-header { font-size:16px; font-weight:bold; text-align:center; padding:6px 0 2px; color:#333; }
 .col-avg { font-weight:normal; font-size:16px; color:#888; margin-left:8px; }
 /* 替补表（位置深度检查） */
-.d-row { background:#fafafa; border:1px solid #e5e5e5; border-radius:8px; padding:8px 10px; }
-.d-row + .d-row { margin-top:6px; }
-.d-head { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
-.d-slot { font-size:16px; font-weight:bold; color:#333; letter-spacing:1px; }
-.d-count { font-size:13px; color:#666; font-weight:bold; }
-.d-gap { font-size:12px; color:#c0392b; font-weight:bold; border:1px solid #c0392b; border-radius:10px; padding:0 6px; }
+.d-row { background:#fafafa; border:1px solid #e5e5e5; border-radius:6px; padding:4px 8px; }
+.d-row + .d-row { margin-top:4px; }
+.d-head { display:flex; align-items:center; gap:8px; margin-bottom:2px; }
+.d-slot { font-size:13px; font-weight:bold; color:#333; letter-spacing:1px; }
+.d-count { font-size:12px; color:#666; font-weight:bold; }
+.d-gap { font-size:11px; color:#c0392b; font-weight:bold; border:1px solid #c0392b; border-radius:10px; padding:0 5px; }
 .d-ok { border-color:#e5e5e5; }
 .d-short { border-color:#e8b4b4; background:#fdf6f6; }
-.d-players { font-size:12px; color:#555; line-height:1.6; }
-.d-main { font-weight:bold; color:#1a5276; }
+.d-players { font-size:11px; color:#555; line-height:1.5; }
+/* 可卖榜 */
+.s-row { display:flex; align-items:center; gap:8px; padding:3px 6px; border-bottom:1px solid #f0f0f0; font-size:12px; }
+.s-row:last-child { border-bottom:none; }
+.s-rank { width:20px; color:#999; font-weight:bold; text-align:center; }
+.s-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.s-pos { color:#888; font-size:11px; width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.s-age { color:#666; font-size:11px; width:36px; text-align:right; }
+.s-stat { font-weight:bold; color:#c0392b; width:44px; text-align:right; }
+.s-ea { font-weight:bold; color:#16a085; width:50px; text-align:right; }

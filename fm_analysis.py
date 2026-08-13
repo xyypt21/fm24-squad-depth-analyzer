@@ -469,37 +469,45 @@ def compute_position_pool(candidates: List[dict]) -> Dict[str, List[dict]]:
 
 
 def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
-    """渲染替补表：每个位置列出池子中全部球员，标注主力/非主力。
+    """渲染替补表：每个位置只列出池子中的替补（未入选 22 人的球员）。
 
-    主力 = 入选匈牙利 22 人（chosen_ids），加粗高亮；
-    非主力 = 池子里未入选的替补。
     chosen_ids: 匈牙利算法选出的 22 人 id 集合。
     """
     if not pool:
         return "<div class='remaining'>无数据</div>"
     rows = []
     for slot, players in pool.items():
-        mains = [p for p in players if id(p) in chosen_ids]
         bench = [p for p in players if id(p) not in chosen_ids]
         gap = max(0, position_pool_size(slot) - len(players))
         status_cls = "d-ok" if not gap else "d-short"
-        main_text = "、".join(
-            f"<span class='d-main'>{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})</span>"
-            for p in mains
-        )
-        bench_text = "、".join(
+        names = "、".join(
             f"{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})" for p in bench
-        )
-        if main_text and bench_text:
-            names = main_text + "、" + bench_text
-        else:
-            names = main_text or bench_text or "无"
+        ) or "无"
         rows.append(
             f"<div class='d-row {status_cls}'>"
             f"<div class='d-head'><span class='d-slot'>{slot}</span>"
-            f"<span class='d-count'>池{len(players)}人 · 主力{len(mains)} · 替补{len(bench)}</span>"
+            f"<span class='d-count'>替补{len(bench)}/{len(players)}</span>"
             f"{('<span class=\'d-gap\'>缺 ' + str(gap) + ' 人</span>') if gap else ''}</div>"
             f"<div class='d-players'>{names}</div>"
+            f"</div>"
+        )
+    return "<div class='remaining'>" + "".join(rows) + "</div>"
+
+
+def render_sell_table(players: List[dict]) -> str:
+    """渲染可卖榜：既不在 22 人主力、也不在替补表的人，按年龄降序取前 11。"""
+    if not players:
+        return "<div class='remaining'>无可卖球员</div>"
+    rows = []
+    for rank, p in enumerate(players, 1):
+        rows.append(
+            f"<div class='s-row'>"
+            f"<span class='s-rank'>{rank}</span>"
+            f"<span class='s-name'>{p['name']}</span>"
+            f"<span class='s-pos'>{p['position']}</span>"
+            f"<span class='s-age'>{p['age']:.0f}岁</span>"
+            f"<span class='s-stat'>CA{p['ca']}</span>"
+            f"<span class='s-ea'>EA{p['ea']:.0f}</span>"
             f"</div>"
         )
     return "<div class='remaining'>" + "".join(rows) + "</div>"
@@ -509,6 +517,7 @@ def generate_full_html(
     ea_first,
     ea_second,
     depth_html=None,
+    sell_html=None,
     ratio=0.9,
 ):
     template_dir = Path(__file__).parent / "templates"
@@ -523,6 +532,10 @@ def generate_full_html(
         .replace(
             "{{DEPTH}}",
             depth_html or render_depth_table({}),
+        )
+        .replace(
+            "{{SELL}}",
+            sell_html or render_sell_table([]),
         )
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
         .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
@@ -570,18 +583,30 @@ def analyze(
     ea_first, ea_second = select_squad(candidates, "ea")
     chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
 
-    # 替补表：位置池（每位置 CA 前 N 人）里的非主力（未入选 22 人）
+    # 替补表：位置池（每位置 EA 前 N 人）里的非主力（未入选 22 人）
     pool = compute_position_pool(candidates)
     depth_html = render_depth_table(pool, chosen_ids)
 
-    # 只翻译最终出现在网页（入选阵容 + 替补表）里的球员名字，避免多余请求
-    pool_players = [p for players in pool.values() for p in players]
-    _translate_xi_names(ea_first, ea_second, pool_players, translate=translate)
+    # 可卖榜：既不在 22 人主力、也不在替补表（任何位置池）的人，按年龄降序前 11
+    pool_ids = {id(p) for players in pool.values() for p in players}
+    sell_candidates = [p for p in candidates if id(p) not in chosen_ids and id(p) not in pool_ids]
+    sell_candidates.sort(key=lambda p: p["age"], reverse=True)
+    sell_top = sell_candidates[:11]
+    sell_html = render_sell_table(sell_top)
+
+    # 只翻译最终出现在网页（入选阵容 + 替补表 + 可卖榜）里的球员名字
+    _translate_xi_names(
+        ea_first, ea_second,
+        [p for players in pool.values() for p in players],
+        sell_top,
+        translate=translate,
+    )
 
     html = generate_full_html(
         ea_first,
         ea_second,
         depth_html=depth_html,
+        sell_html=sell_html,
         ratio=ratio,
     )
     out = output or OUTPUT
