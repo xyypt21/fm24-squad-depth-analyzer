@@ -24,7 +24,7 @@ def main() -> None:
     print(f"[cli] 读到 {len(roster)} 名球员")
     html = analyze(
         roster,
-        min_age=config["min_age"],
+        ca_ratio=config["ca_ratio"],
         growth_until_age=config["growth_until_age"],
         growth_per_year=config["growth_per_year"],
         ratio=config["ratio_best"],

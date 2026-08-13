@@ -32,51 +32,59 @@ class FmGui:
 
         self._config = load_config()
         self.club_var = tk.StringVar(value=str(self._config["club_uid"]))
-
-        club_row = ttk.Frame(frm)
-        club_row.grid(row=0, column=0, columnspan=3, sticky="ew", **pad)
-        ttk.Label(club_row, text="俱乐部 ID:").pack(side="left")
-        ttk.Entry(club_row, textvariable=self.club_var, width=10).pack(side="left")
-
-        ea_row = ttk.Frame(frm)
-        ea_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
-        self.min_age_var = tk.StringVar(value=str(self._config["min_age"]))
-        self.ea_age_var = tk.StringVar(value=str(self._config["growth_until_age"]))
-        self.ea_growth_var = tk.StringVar(value=str(self._config["growth_per_year"]))
-        ttk.Label(ea_row, text="最小年龄:").pack(side="left")
-        ttk.Entry(ea_row, textvariable=self.min_age_var, width=6).pack(side="left", padx=(0, 10))
-        ttk.Label(ea_row, text="EA成长至年龄:").pack(side="left")
-        ttk.Entry(ea_row, textvariable=self.ea_age_var, width=6).pack(side="left", padx=(0, 10))
-        ttk.Label(ea_row, text="EA每年成长:").pack(side="left")
-        ttk.Entry(ea_row, textvariable=self.ea_growth_var, width=6).pack(side="left")
-
-        opt_row = ttk.Frame(frm)
-        opt_row.grid(row=2, column=0, columnspan=3, sticky="ew", **pad)
-        self.translate_var = tk.BooleanVar(value=bool(self._config.get("translate_names", False)))
-        ttk.Checkbutton(opt_row, text="翻译球员名字为中文", variable=self.translate_var).pack(
-            side="left"
-        )
-
-        thr_row = ttk.Frame(frm)
-        thr_row.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
-        self.ratio_var = tk.StringVar(value=str(self._config.get("ratio_best", 0.9)))
-        ttk.Label(thr_row, text="阈值(相对最佳11人均EA):").pack(side="left")
-        ttk.Entry(thr_row, textvariable=self.ratio_var, width=5).pack(side="left", padx=(6, 0))
-
-        club2_row = ttk.Frame(frm)
-        club2_row.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
         self.compare_var = tk.BooleanVar(value=bool(self._config.get("merge_club2", False)))
         self.club2_var = tk.StringVar(
             value=str(self._config.get("club2_uid", 0) or 0)
             if self._config.get("club2_uid")
             else ""
         )
+
+        club_row = ttk.Frame(frm)
+        club_row.grid(row=0, column=0, columnspan=3, sticky="ew", **pad)
+        ttk.Label(club_row, text="俱乐部 ID:").pack(side="left")
+        ttk.Entry(club_row, textvariable=self.club_var, width=10).pack(side="left")
         ttk.Checkbutton(
-            club2_row, text="合并第二俱乐部", variable=self.compare_var, command=self._toggle_club2
-        ).pack(side="left")
-        self.club2_entry = ttk.Entry(club2_row, textvariable=self.club2_var, width=10)
-        self.club2_entry.pack(side="left", padx=(4, 10))
+            club_row, text="合并第二俱乐部", variable=self.compare_var, command=self._toggle_club2
+        ).pack(side="left", padx=(10, 0))
+        self.club2_entry = ttk.Entry(club_row, textvariable=self.club2_var, width=10)
+        self.club2_entry.pack(side="left", padx=(4, 0))
         self._refresh_club2_state()
+
+        thr_row = ttk.Frame(frm)
+        thr_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
+        self.ca_ratio_var = tk.StringVar(value=str(self._config.get("ca_ratio", 0.8)))
+        self.ratio_var = tk.StringVar(value=str(self._config.get("ratio_best", 0.9)))
+        ttk.Label(thr_row, text="CA阈值:").pack(side="left")
+        ttk.Entry(thr_row, textvariable=self.ca_ratio_var, width=5).pack(side="left", padx=(0, 10))
+        ttk.Label(thr_row, text="弱项阈值(相对最佳均EA):").pack(side="left")
+        ttk.Entry(thr_row, textvariable=self.ratio_var, width=5).pack(side="left", padx=(6, 0))
+
+        thr_hint = ttk.Frame(frm)
+        thr_hint.grid(row=2, column=0, columnspan=3, sticky="ew", **pad)
+        ttk.Label(
+            thr_hint,
+            text="CA阈值：只统计当前能力不低于(CA图首发均CA×阈值)的球员；"
+            "弱项阈值：EA低于最佳11人均EA×阈值的位置标红。",
+            foreground="#555",
+            justify="left",
+            wraplength=430,
+        ).pack(side="left")
+
+        ea_row = ttk.Frame(frm)
+        ea_row.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
+        self.ea_age_var = tk.StringVar(value=str(self._config["growth_until_age"]))
+        self.ea_growth_var = tk.StringVar(value=str(self._config["growth_per_year"]))
+        ttk.Label(ea_row, text="EA成长至年龄:").pack(side="left")
+        ttk.Entry(ea_row, textvariable=self.ea_age_var, width=6).pack(side="left", padx=(0, 10))
+        ttk.Label(ea_row, text="EA每年成长:").pack(side="left")
+        ttk.Entry(ea_row, textvariable=self.ea_growth_var, width=6).pack(side="left")
+
+        opt_row = ttk.Frame(frm)
+        opt_row.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
+        self.translate_var = tk.BooleanVar(value=bool(self._config.get("translate_names", False)))
+        ttk.Checkbutton(opt_row, text="翻译球员名字为中文", variable=self.translate_var).pack(
+            side="left"
+        )
 
         self.formula_var = tk.StringVar()
         ttk.Label(frm, textvariable=self.formula_var, foreground="#555", justify="left").grid(
@@ -149,10 +157,10 @@ class FmGui:
             club_uid = self._get_club_uid()
             if club_uid <= 0:
                 raise ValueError
-            min_age = int(self.min_age_var.get())
+            ca_ratio = self._parse_ratio(self.ca_ratio_var.get())
             growth_until_age = int(self.ea_age_var.get())
             growth_per_year = int(self.ea_growth_var.get())
-            if min_age <= 0 or growth_until_age <= 0 or growth_per_year < 0:
+            if growth_until_age <= 0 or growth_per_year < 0:
                 raise ValueError
             ratio = self._parse_ratio(self.ratio_var.get())
         except ValueError:
@@ -176,7 +184,7 @@ class FmGui:
         save_config(
             {
                 "club_uid": club_uid,
-                "min_age": min_age,
+                "ca_ratio": ca_ratio,
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
                 "translate_names": self.translate_var.get(),
@@ -192,7 +200,7 @@ class FmGui:
             f"俱乐部 ID: {club_uid}" + (f"，合并第二俱乐部 {club2_uid}" if club2_uid else "")
         )
         self.log_line(
-            f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
+            f"参数: EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}，CA阈值 {ca_ratio:.0%}"
         )
         self.log_line(
             f"阈值(相对最佳均EA): {ratio:.0%}"
@@ -203,7 +211,7 @@ class FmGui:
             args=(
                 club_uid,
                 club2_uid,
-                min_age,
+                ca_ratio,
                 growth_until_age,
                 growth_per_year,
                 self.translate_var.get(),
@@ -217,7 +225,7 @@ class FmGui:
         self,
         club_uid,
         club2_uid,
-        min_age,
+        ca_ratio,
         growth_until_age,
         growth_per_year,
         translate,
@@ -247,7 +255,7 @@ class FmGui:
             html = analyze(
                 roster,
                 output=OUTPUT,
-                min_age=min_age,
+                ca_ratio=ca_ratio,
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
                 translate=translate,

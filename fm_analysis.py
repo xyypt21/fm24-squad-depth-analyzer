@@ -18,8 +18,11 @@ import json
 import os
 import re
 import socket
+import ssl
+import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import quote
 
 import numpy as np
 
@@ -28,6 +31,7 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 DEFAULT_CONFIG: Dict[str, Any] = {
     "club_uid": 920,
     "min_age": 17,
+    "ca_ratio": 0.8,
     "growth_until_age": 21,
     "growth_per_year": 20,
     "translate_names": False,
@@ -49,6 +53,7 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
     return {
         "club_uid": int(merged["club_uid"]),
         "min_age": int(merged["min_age"]),
+        "ca_ratio": float(merged["ca_ratio"]),
         "growth_until_age": int(merged["growth_until_age"]),
         "growth_per_year": int(merged["growth_per_year"]),
         "translate_names": bool(merged["translate_names"]),
@@ -135,10 +140,10 @@ _failed: set = set()
 # 可通过环境变量 FM_PROXY 覆盖，空字符串/None 表示不走代理。
 PROXY_URL = os.environ.get("FM_PROXY", "http://127.0.0.1:7897")
 
-# 单次请求超时（deep-translator 未显式设 timeout，代理不通会无限阻塞）
+# 单次请求超时（代理不通会无限阻塞）
 _REQUEST_TIMEOUT = 10
-# 单个名字失败重试次数
-_RETRIES = 2
+# 单批翻译失败重试次数（代理/网关偶发 SSL 断连，重试通常即成功）
+_RETRIES = 3
 
 
 def _proxies():
@@ -150,33 +155,43 @@ def _proxies():
 def _translate_batch(names, proxies):
     """把整批名字每行一个 "player:xxx" 拼成一段一次翻译，再按行拆回。
 
+    走 Google gtx 公开端点，逐段拆回 originalText 与译文对齐。
     逐行 "player:" 前缀让 Google 把每行当球员名处理，能正确识别名/姓、保留
-    间隔号（·），且不会像 "name:" 那样把个别名字原样返回。
-    保持原始大小写。返回 {原名: 中文}；翻译异常/未命中的名字不返回。
+    间隔号（·）。保持原始大小写。返回 {原名: 中文}；译文与原名相同或异常时
+    不返回该名字。
     """
     if not names:
         return {}
     text = "\n".join("player:" + n for n in names)
     try:
-        from deep_translator import GoogleTranslator  # noqa: PLC0415 延迟导入，加快启动
-
-        # deep-translator 未设 socket 超时，代理不通会无限阻塞；设全局默认超时兜底
-        _previous = socket.getdefaulttimeout()
-        socket.setdefaulttimeout(_REQUEST_TIMEOUT)
-        try:
-            out = GoogleTranslator(source="en", target="zh-CN", proxies=proxies).translate(text)
-        finally:
-            socket.setdefaulttimeout(_previous)
+        url = (
+            "https://translate.googleapis.com/translate_a/single"
+            "?client=gtx&sl=en&tl=zh-CN&dt=t&q="
+            + quote(text)
+        )
+        proxy_handler = urllib.request.ProxyHandler(proxies or {})
+        # gtx 是公开端点，无证书链校验，避免个别代理/网关打断 TLS
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        https_handler = urllib.request.HTTPSHandler(context=ctx)
+        opener = urllib.request.build_opener(proxy_handler, https_handler)
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "Mozilla/5.0", "Accept-Encoding": "identity"}
+        )
+        with opener.open(req, timeout=_REQUEST_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
     except Exception:
         # 网络/代理/SSL 异常一律静默：翻译失败时保留英文原名，不阻塞分析
         return {}
-    if not out:
+    if not data or not data[0]:
         return {}
-
-    # 每行剥掉 "玩家：/球员：/姓名：/名称：" 前缀后与原名逐行对应
+    # 每行译文都带 "球员：/玩家：" 前缀，剥掉后与原名逐行对应
     lines = []
-    for line in out.split("\n"):
-        line = line.strip()
+    for seg in data[0]:
+        if not seg or not seg[0]:
+            continue
+        line = seg[0].strip()
         for sep in ("：", ":"):
             if sep in line:
                 line = line.split(sep, 1)[1].strip()
@@ -371,22 +386,34 @@ def render_pitch_22_card(ea_first, ea_second, sort_key, ratio=0.9):
     )
 
 
-def render_matured_list(players):
-    """Render a simple list of remaining matured players, sorted by CA."""
-    if not players:
-        return "<div class='empty'>无符合条件球员</div>"
-    rows = []
-    for i, p in enumerate(players, 1):
-        rows.append(
-            f"<div class='pl-row'><span class='pl-rank'>{i}</span>"
-            f"<span class='pl-name'>{p['name']}</span>"
-            f"<span class='pl-pos'>{p['position']}</span>"
-            f"<span class='pl-stat'>{p['age']:.1f}岁 · CA{p['ca']} · EA{p['ea']:.0f}</span></div>"
-        )
-    return "<div class='player-list'>" + "".join(rows) + "</div>"
+def select_squad(candidates: List[dict], key: str):
+    """匈牙利一次选 22 人 + 按位置归位，返回 (首发 11, 替补 11)。
+
+    同一位置多槽成本等价，求解器不区分首发/替补；按位置归位：
+    每个位置（SLOTS 里出现 k 次）取该位置全部 2k 人中 key 前 k 名进首发。
+    注意不能逐槽对位比较——二队 DC2 可能比一队 DC1 更强。
+    """
+    picks = select_best_xi(candidates, key, SLOTS_22)
+    ea_first = picks[:11]
+    ea_second = picks[11:]
+    by_pos: Dict[str, List[dict]] = {s: [] for s in SLOTS}
+    for (_slot, p) in ea_first:
+        by_pos[_slot].append(p)
+    for (_slot, p) in ea_second:
+        by_pos[_slot].append(p)
+    ea_first = []
+    ea_second = []
+    # 按去重位置遍历：每个位置（在 SLOTS 出现 k 次）有 2k 人，key 前 k 进首发。
+    # 不能直接 for slot in SLOTS——DC/DMC 重复出现会整组重复入队。
+    for slot in dict.fromkeys(SLOTS):
+        k = SLOTS.count(slot)
+        group = sorted(by_pos[slot], key=lambda p: p[key], reverse=True)
+        ea_first.extend((slot, p) for p in group[:k])
+        ea_second.extend((slot, p) for p in group[k : k * 2])
+    return ea_first, ea_second
 
 
-def generate_full_html(ea_first, ea_second, matured, ratio=0.9):
+def generate_full_html(ea_first, ea_second, ca_first, ca_second, ratio=0.9, ca_threshold=None):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
     css = (template_dir / "style.css").read_text(encoding="utf-8")
@@ -396,9 +423,12 @@ def generate_full_html(ea_first, ea_second, matured, ratio=0.9):
             "{{PITCH_22}}",
             render_pitch_22_card(ea_first, ea_second, "ea", ratio),
         )
-        .replace("{{LIST_MATURED}}", render_matured_list(matured))
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
         .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
+        .replace(
+            "{{CA_THRESHOLD}}",
+            str(int(round(ca_threshold))) if ca_threshold is not None else "",
+        )
     )
 
 
@@ -407,6 +437,7 @@ def analyze(
     roster: List[dict],
     output: Optional[Path] = None,
     min_age: int = 17,
+    ca_ratio: float = 0.8,
     growth_until_age: int = 21,
     growth_per_year: int = 20,
     translate: bool = True,
@@ -418,6 +449,7 @@ def analyze(
     roster: list of player dicts, each with name/age/position/ca/pa.
     output: HTML output path, defaults to OUTPUT.
     min_age: only players aged >= min_age are considered (default 17).
+    ca_ratio: EA 候选门槛 = 首发平均 CA × 该比例，CA 低于门槛的球员不纳入 EA (default 0.8).
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     translate: translate selected player names to Chinese (default True).
@@ -425,55 +457,30 @@ def analyze(
     applied to both XIs (default 0.9).
     Returns the HTML string, or None if roster is empty.
     """
-    candidates = [p for p in roster if p["age"] >= min_age]
+    candidates = list(roster)
     if not candidates:
         print("未找到阵容数据")
         return None
 
-    calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
+    # 先算 CA 图（全量候选，无年龄过滤），取首发 11 人平均 CA
+    ca_first, ca_second = select_squad(candidates, "ca")
+    ca_threshold = compute_average(ca_first, "ca") * ca_ratio
 
-    # 一次匈牙利算法选出 22 人（首发 11 + 替补 11），整体最优而非两次贪心
-    picks = select_best_xi(candidates, "ea", SLOTS_22)
-    ea_first = picks[:11]
-    ea_second = picks[11:]
-    # 同一位置多槽成本等价，求解器不区分首发/替补；按位置归位：
-    # 每个位置（SLOTS 里出现 k 次）取该位置全部 2k 人中 EA 前 k 名进首发。
-    # 不能逐槽对位比较——二队 DC2 可能比一队 DC1 更强。
-    by_pos: Dict[str, List[dict]] = {s: [] for s in SLOTS}
-    for (_slot, p) in ea_first:
-        by_pos[_slot].append(p)
-    for (_slot, p) in ea_second:
-        by_pos[_slot].append(p)
-    ea_first = []
-    ea_second = []
-    # 按去重位置遍历：每个位置（在 SLOTS 出现 k 次）有 2k 人，EA 前 k 进首发。
-    # 不能直接 for slot in SLOTS——DC/DMC 重复出现会整组重复入队。
-    for slot in dict.fromkeys(SLOTS):
-        k = SLOTS.count(slot)
-        group = sorted(by_pos[slot], key=lambda p: p["ea"], reverse=True)
-        ea_first.extend((slot, p) for p in group[:k])
-        ea_second.extend((slot, p) for p in group[k : k * 2])
+    # EA 图候选：CA 低于阈值的一律不纳入 EA 计算
+    ea_candidates = [p for p in candidates if p["ca"] >= ca_threshold]
+    calculate_ea(ea_candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
+    ea_first, ea_second = select_squad(ea_candidates, "ea")
 
-    # 剩余球员（≥ 最小年龄）前 10 人，排除门将，按 CA 降序列榜
-    used_ea = {id(p) for _, p in picks}
-    matured = sorted(
-        (
-            p
-            for p in candidates
-            if id(p) not in used_ea and p["age"] >= min_age and not player_can_play(p["position"], "GK")
-        ),
-        key=lambda p: p["ca"],
-        reverse=True,
-    )[:10]
-
-    # 只翻译最终出现在网页（入选阵容）里的球员名字，避免多余请求
-    _translate_xi_names(ea_first, ea_second, matured, translate=translate)
+    # 只翻译最终出现在网页（入选 EA 阵容）里的球员名字，避免多余请求
+    _translate_xi_names(ea_first, ea_second, translate=translate)
 
     html = generate_full_html(
         ea_first,
         ea_second,
-        matured,
+        ca_first,
+        ca_second,
         ratio=ratio,
+        ca_threshold=ca_threshold,
     )
     out = output or OUTPUT
     out.write_text(html, encoding="utf-8")
