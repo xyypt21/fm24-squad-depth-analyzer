@@ -447,11 +447,62 @@ def render_remaining_list(players: List[dict]) -> str:
     return "<div class='remaining'>" + "".join(rows) + "</div>"
 
 
+# ── 位置深度检查（替补表）────────────────────────────────
+def position_depth_target(slot_name: str) -> int:
+    """某位置的目标深度人数 = 该位置在首发阵型中的出现次数 × 2 + 2。
+
+    例：DL 出现 1 次 → 4；DC 出现 2 次 → 6。
+    保证每个槽位首发+替补后，还多 2 人轮换。
+    """
+    return SLOTS.count(slot_name) * 2 + 2
+
+
+def compute_position_depth(candidates: List[dict]) -> Dict[str, dict]:
+    """统计每个位置的有熟练度球员，返回 {slot: {target, players}}。
+
+    players 为该位置所有天然位置球员按 EA 降序（不限量，用于缺口判断）。
+    同一球员可属多个位置（多面手会出现在多个位置行）。
+    """
+    depth: Dict[str, dict] = {}
+    for slot in dict.fromkeys(SLOTS):  # 保持阵型内位置顺序去重
+        able = [
+            p for p in candidates if player_can_play(p["position"], slot)
+        ]
+        able.sort(key=lambda p: p["ea"], reverse=True)
+        depth[slot] = {"target": position_depth_target(slot), "players": able}
+    return depth
+
+
+def render_depth_table(depth: Dict[str, dict]) -> str:
+    """渲染替补表：每个位置一行，列出会打该位置的球员，标注缺口。"""
+    if not depth:
+        return "<div class='remaining'>无数据</div>"
+    rows = []
+    for slot, info in depth.items():
+        target = info["target"]
+        players = info["players"]
+        have = len(players)
+        gap = max(0, target - have)
+        status_cls = "d-ok" if gap == 0 else "d-short"
+        names = "、".join(
+            f"{p['name']}(EA{int(round(p['ea']))})" for p in players[:target]
+        ) or "无"
+        extra = "" if have <= target else f" 等 {have} 人"
+        rows.append(
+            f"<div class='d-row {status_cls}'>"
+            f"<div class='d-head'><span class='d-slot'>{slot}</span>"
+            f"<span class='d-count'>{have}/{target}</span>"
+            f"{('<span class=\'d-gap\'>缺 ' + str(gap) + ' 人</span>') if gap else ''}</div>"
+            f"<div class='d-players'>{names}{extra}</div>"
+            f"</div>"
+        )
+    return "<div class='remaining'>" + "".join(rows) + "</div>"
+
+
 def generate_full_html(
     ea_first,
     ea_second,
-    remaining_ca=None,
-    remaining_ea=None,
+    depth_html=None,
     ratio=0.9,
     ca_threshold=None,
 ):
@@ -465,12 +516,8 @@ def generate_full_html(
             render_pitch_22_card(ea_first, ea_second, "ea", ratio),
         )
         .replace(
-            "{{REMAINING_CA}}",
-            render_remaining_list(remaining_ca or []),
-        )
-        .replace(
-            "{{REMAINING_EA}}",
-            render_remaining_list(remaining_ea or []),
+            "{{DEPTH}}",
+            depth_html or render_depth_table({}),
         )
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
         .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
@@ -524,25 +571,25 @@ def analyze(
 
     # 门槛 = 除门将外按 CA 降序第 30 人的 CA，低于门槛的球员不纳入 EA 计算
     ca_threshold = compute_ca_threshold(candidates)
-    # 全部球员都算 EA（剩余榜也展示 EA），但 EA 22 人阵容只从达门槛者中选
+    # 全部球员都算 EA（替补表也展示 EA），但 EA 22 人阵容只从达门槛者中选
     calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
     ea_candidates = [p for p in candidates if p["ca"] >= ca_threshold]
     ea_first, ea_second = select_squad(ea_candidates, "ea")
 
-    # 剩余球员 = 未入选 EA 22 人的全部球员（不过滤门槛），分别按 CA、EA 排序取前 11
-    chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
-    remaining_all = [p for p in candidates if id(p) not in chosen_ids]
-    remaining_ca = sorted(remaining_all, key=lambda p: p["ca"], reverse=True)[:11]
-    remaining_ea = sorted(remaining_all, key=lambda p: p["ea"], reverse=True)[:11]
+    # 替补表：全队按位置统计有熟练度球员（不过滤门槛），看深度缺口
+    depth = compute_position_depth(candidates)
+    depth_html = render_depth_table(depth)
 
-    # 只翻译最终出现在网页（入选阵容 + 剩余榜）里的球员名字，避免多余请求
-    _translate_xi_names(ea_first, ea_second, remaining_ca, remaining_ea, translate=translate)
+    # 只翻译最终出现在网页（入选阵容 + 替补表）里的球员名字，避免多余请求
+    depth_players = [
+        p for info in depth.values() for p in info["players"]
+    ]
+    _translate_xi_names(ea_first, ea_second, depth_players, translate=translate)
 
     html = generate_full_html(
         ea_first,
         ea_second,
-        remaining_ca=remaining_ca,
-        remaining_ea=remaining_ea,
+        depth_html=depth_html,
         ratio=ratio,
         ca_threshold=ca_threshold,
     )
