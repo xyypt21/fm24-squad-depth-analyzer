@@ -456,14 +456,14 @@ def position_pool_size(slot_name: str) -> int:
 
 
 def compute_position_pool(candidates: List[dict]) -> Dict[str, List[dict]]:
-    """每个位置取 CA 前 N 人组成池子（同一球员可属多个位置）。
+    """每个位置取 EA 前 N 人组成池子（同一球员可属多个位置）。
 
     N = position_pool_size：GK=3、DC/DMC=6、其余=4。
     """
     pool: Dict[str, List[dict]] = {}
     for slot in dict.fromkeys(SLOTS):  # 保持阵型内位置顺序去重
         able = [p for p in candidates if player_can_play(p["position"], slot)]
-        able.sort(key=lambda p: p["ca"], reverse=True)
+        able.sort(key=lambda p: p["ea"], reverse=True)
         pool[slot] = able[: position_pool_size(slot)]
     return pool
 
