@@ -146,6 +146,7 @@ P_BIRTH_YEAR = 0x2BE  # +702  u16 出生年
 P_NAME_FULL = 0x2C0  # +704  完整名串指针（可空）
 P_NAME_FIRST = 0x2D0  # +720  名持有者指针（->[0]->名串）
 P_NAME_LAST = 0x2D8  # +728  姓持有者指针（->[0]->姓串）
+P_NAME_COMMON = 0x2E0  # +736  游戏显示名（短名）串指针（可空，如 Trilli/Rafinha）
 P_CLUB_CUR = 0x130  # +304  当前俱乐部条目指针（56 字节条目, [+0xC]=uid）
 # 合同俱乐部：+832  -> S(180B) -> [S+0x10] -> 俱乐部条目(56B) -> [+0xC]=uid
 P_CONTRACT_S = 0x340  # +832  合同结构指针
@@ -342,6 +343,9 @@ def _read_len_str(mem, ptr):
     return None
 
 
+# ── 短名（common_name）：见 P_NAME_COMMON（+0x2E0），read_player 已直接读取 ──
+
+
 def _club_entry_uid(mem, ptr):
     """56 字节俱乐部条目 -> [+0xC] 队 uid（注意：青年队是独立队 uid）；校验头类型。"""
     if not ptr:
@@ -472,10 +476,13 @@ def read_player(mem, rec, raw=None):
     full = _read_len_str(mem, _u64(P_NAME_FULL))
     first = _read_len_str(mem, _u64(P_NAME_FIRST))
     last = _read_len_str(mem, _u64(P_NAME_LAST))
-    # 优先用 名+姓 拼接：FULL 串可能含多余中间名（如 Forzan Assan Ouédraogo）。
-    # first 可能含多个词（如 Derry John），只取第一个；first/last 任一缺失时退回 FULL。
+    common = _read_len_str(mem, _u64(P_NAME_COMMON))
+    # 名字优先级：common（游戏短名）> first 第一个词 + last 第一个词。
+    # 不采用 full：full 常含多余中间名（如 Forzan Assan Ouédraogo）；
+    # first/last 也可能含多个词（如 Derry John、García Beltrán），各取第一个。
     first_name = first.split(" ")[0] if first else ""
-    name = (first_name + " " + (last or "")).strip() or full or None
+    last_name = last.split(" ")[0] if last else ""
+    name = common or (first_name + " " + last_name).strip() or None
     ca = _u16(P_CA)
     pa = _u16(P_PA)
     year = _u16(P_BIRTH_YEAR)
@@ -497,6 +504,8 @@ def read_player(mem, rec, raw=None):
     return {
         "entity_id": int.from_bytes(raw[P_ENTITY_ID : P_ENTITY_ID + 4], "little"),
         "name": name,
+        "first": first or None,
+        "last": last or None,
         "ca": ca,
         "pa": pa,
         "year": year,

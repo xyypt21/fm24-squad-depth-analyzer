@@ -29,7 +29,6 @@ def main() -> None:
         growth_per_year=config["growth_per_year"],
         ratio_best=config["ratio_best"],
         ratio_second=config["ratio_second"],
-        ratio_third=config["ratio_third"],
     )
     if not html:
         sys.exit(1)

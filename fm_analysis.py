@@ -2,9 +2,9 @@
 FM2024 4-2-3-1 squad depth analysis core.
 
 Computes EA (Expected Ability) for every player and uses the Hungarian algorithm
-to pick the three best non-overlapping starting XIs by EA, then renders an HTML
+to pick the two best non-overlapping starting XIs by EA, then renders an HTML
 report. Weak-slot highlighting uses the first XI's average EA as reference,
-at 90% / 85% / 80% for the three XIs respectively. Also
+at 90% / 85% for the two XIs respectively. Also
 loads/saves the config file, parses FM position strings,
 and optionally translates selected player names to Chinese.
 
@@ -35,7 +35,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "club2_uid": 0,
     "ratio_best": 0.9,
     "ratio_second": 0.85,
-    "ratio_third": 0.8,
 }
 
 
@@ -58,7 +57,6 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
         "club2_uid": int(merged["club2_uid"]),
         "ratio_best": float(merged["ratio_best"]),
         "ratio_second": float(merged["ratio_second"]),
-        "ratio_third": float(merged["ratio_third"]),
     }
 
 
@@ -167,7 +165,8 @@ def _translate_batch(names, proxies):
             out = GoogleTranslator(source="en", target="zh-CN", proxies=proxies).translate(text)
         finally:
             socket.setdefaulttimeout(_previous)
-    except ImportError:
+    except Exception:
+        # 网络/代理/SSL 异常一律静默：翻译失败时保留英文原名，不阻塞分析
         return {}
     if not out:
         return {}
@@ -227,29 +226,33 @@ def auto_translate(names):
     return _batch_translate(names)
 
 
-def _translate_xi_names(*xis, translate: bool = True) -> None:
-    """把入选 XI 的球员名翻译成中文。
+def _translate_xi_names(*groups, translate: bool = True) -> None:
+    """把入选名单的球员名翻译成中文。
 
     translate: 为 False 时原样保留英文名。
-    启用时：对多组 XI 去重收集名字，整批一次走 Google 在线翻译（经本地代理），
+    启用时：对多组名单去重收集名字，整批一次走 Google 在线翻译（经本地代理），
     就地改 player dict 的 name，未命中的保持原样。
+    groups: 每组是 (位置, 球员) 元组的 XI，或纯球员 dict 列表（如成熟球员榜）。
     """
     if not translate:
         return
+    players = [
+        item if isinstance(item, dict) else item[1]
+        for group in groups
+        for item in group
+    ]
     seen = set()
     names = []
-    for xi in xis:
-        for _pos, p in xi:
-            if p["name"] not in seen:
-                seen.add(p["name"])
-                names.append(p["name"])
+    for p in players:
+        if p["name"] not in seen:
+            seen.add(p["name"])
+            names.append(p["name"])
     if not names:
         return
     translated = auto_translate(names)
-    for xi in xis:
-        for _pos, p in xi:
-            if p["name"] in translated:
-                p["name"] = translated[p["name"]]
+    for p in players:
+        if p["name"] in translated:
+            p["name"] = translated[p["name"]]
 
 
 # ── EA calculation ─────────────────────────────────────────
@@ -352,14 +355,21 @@ def render_pitch_card(xi, sort_key, reference=None, ratio=0.9):
     return f"<div class='pitch'>{render_pitch(xi, sort_key, reference or average, ratio)}</div>"
 
 
-def generate_full_html(
-    ea_first,
-    ea_second,
-    ea_third,
-    ratio_best=0.9,
-    ratio_second=0.85,
-    ratio_third=0.8,
-):
+def render_matured_list(players):
+    """Render a simple list of remaining matured players, sorted by EA."""
+    if not players:
+        return "<div class='empty'>无符合条件球员</div>"
+    rows = []
+    for i, p in enumerate(players, 1):
+        rows.append(
+            f"<div class='pl-row'><span class='pl-rank'>{i}</span>"
+            f"<span class='pl-name'>{p['name']}</span>"
+            f"<span class='pl-stat'>{p['age']:.1f}岁 · CA{p['ca']} · EA{p['ea']:.0f}</span></div>"
+        )
+    return "<div class='player-list'>" + "".join(rows) + "</div>"
+
+
+def generate_full_html(ea_first, ea_second, matured, ratio_best=0.9, ratio_second=0.85):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
     css = (template_dir / "style.css").read_text(encoding="utf-8")
@@ -374,13 +384,9 @@ def generate_full_html(
             "{{PITCH_EA_SECOND}}",
             render_pitch_card(ea_second, "ea", reference=ref_ea, ratio=ratio_second),
         )
-        .replace(
-            "{{PITCH_EA_THIRD}}",
-            render_pitch_card(ea_third, "ea", reference=ref_ea, ratio=ratio_third),
-        )
+        .replace("{{LIST_MATURED}}", render_matured_list(matured))
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
         .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
-        .replace("{{AVG_EA_THIRD}}", str(compute_average(ea_third, "ea")))
     )
 
 
@@ -394,10 +400,9 @@ def analyze(
     translate: bool = True,
     ratio_best: float = 0.9,
     ratio_second: float = 0.85,
-    ratio_third: float = 0.8,
 ) -> Optional[str]:
     """
-    Core analysis flow: compute EA, then pick the three best non-overlapping
+    Core analysis flow: compute EA, then pick the two best non-overlapping
     starting XIs by EA.
     roster: list of player dicts, each with name/age/position/ca/pa.
     output: HTML output path, defaults to OUTPUT.
@@ -405,8 +410,8 @@ def analyze(
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     translate: translate selected player names to Chinese (default True).
-    ratio_best/second/third: weak-slot threshold as a fraction of the first
-    XI's average EA (defaults 0.9 / 0.85 / 0.8).
+    ratio_best/second: weak-slot threshold as a fraction of the first XI's
+    average EA (defaults 0.9 / 0.85).
     Returns the HTML string, or None if roster is empty.
     """
     candidates = [p for p in roster if p["age"] >= min_age]
@@ -419,19 +424,24 @@ def analyze(
     ea_first = select_best_xi(candidates, "ea")
     used_ea = {id(p) for _, p in ea_first}
     ea_second = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
+
+    # 剩余球员中已成熟（年龄 ≥ 成长截止年龄）的前 11 人，按 EA 降序
     used_ea |= {id(p) for _, p in ea_second}
-    ea_third = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
+    matured = sorted(
+        (p for p in candidates if id(p) not in used_ea and p["age"] >= growth_until_age),
+        key=lambda p: p["ea"],
+        reverse=True,
+    )[:11]
 
     # 只翻译最终出现在网页（入选阵容）里的球员名字，避免多余请求
-    _translate_xi_names(ea_first, ea_second, ea_third, translate=translate)
+    _translate_xi_names(ea_first, ea_second, matured, translate=translate)
 
     html = generate_full_html(
         ea_first,
         ea_second,
-        ea_third,
+        matured,
         ratio_best=ratio_best,
         ratio_second=ratio_second,
-        ratio_third=ratio_third,
     )
     out = output or OUTPUT
     out.write_text(html, encoding="utf-8")

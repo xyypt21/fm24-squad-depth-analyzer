@@ -27,7 +27,9 @@ def calc_age_from_ymd(year, doy):
 def _to_roster(players):
     """把读到的球员 dict 列表转换成 analyze 所需的 {name,age,position,ca,pa}。
 
-    名字不在此处汉化：只在 analyze 选中 XI 后，对出现在网页里的球员翻译。
+    名字已在 read_player 里优先用游戏显示名（common_name 短名），无短名时
+    才是拼出的 名+姓。不在此处汉化：只在 analyze 选中 XI 后，对出现在
+    网页里的球员翻译。
     """
     roster = []
     for p in players:
