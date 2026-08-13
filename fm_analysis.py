@@ -447,53 +447,48 @@ def render_remaining_list(players: List[dict]) -> str:
     return "<div class='remaining'>" + "".join(rows) + "</div>"
 
 
-# ── 位置深度检查（替补表）────────────────────────────────
-def position_depth_target(slot_name: str) -> int:
-    """某位置的目标深度人数 = 该位置在首发阵型中的出现次数 × 2 + 2。
-
-    例：DL 出现 1 次 → 4；DC 出现 2 次 → 6。
-    保证每个槽位首发+替补后，还多 2 人轮换。
-    """
+# ── 位置池 + 替补表 ─────────────────────────────────────
+def position_pool_size(slot_name: str) -> int:
+    """某位置的池子大小：GK=3，双槽位(DC/DMC)=6，单槽位=4。"""
+    if slot_name == "GK":
+        return 3
     return SLOTS.count(slot_name) * 2 + 2
 
 
-def compute_position_depth(candidates: List[dict]) -> Dict[str, dict]:
-    """统计每个位置的有熟练度球员，返回 {slot: {target, players}}。
+def compute_position_pool(candidates: List[dict]) -> Dict[str, List[dict]]:
+    """每个位置取 CA 前 N 人组成池子（同一球员可属多个位置）。
 
-    players 为该位置所有天然位置球员按 EA 降序（不限量，用于缺口判断）。
-    同一球员可属多个位置（多面手会出现在多个位置行）。
+    N = position_pool_size：GK=3、DC/DMC=6、其余=4。
     """
-    depth: Dict[str, dict] = {}
+    pool: Dict[str, List[dict]] = {}
     for slot in dict.fromkeys(SLOTS):  # 保持阵型内位置顺序去重
-        able = [
-            p for p in candidates if player_can_play(p["position"], slot)
-        ]
-        able.sort(key=lambda p: p["ea"], reverse=True)
-        depth[slot] = {"target": position_depth_target(slot), "players": able}
-    return depth
+        able = [p for p in candidates if player_can_play(p["position"], slot)]
+        able.sort(key=lambda p: p["ca"], reverse=True)
+        pool[slot] = able[: position_pool_size(slot)]
+    return pool
 
 
-def render_depth_table(depth: Dict[str, dict]) -> str:
-    """渲染替补表：每个位置一行，列出会打该位置的球员，标注缺口。"""
-    if not depth:
+def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
+    """渲染替补表：每个位置列出池子中"非主力"（未入选 22 人）的球员。
+
+    chosen_ids: 匈牙利算法选出的 22 人 id 集合。
+    """
+    if not pool:
         return "<div class='remaining'>无数据</div>"
     rows = []
-    for slot, info in depth.items():
-        target = info["target"]
-        players = info["players"]
-        have = len(players)
-        gap = max(0, target - have)
-        status_cls = "d-ok" if gap == 0 else "d-short"
+    for slot, players in pool.items():
+        bench = [p for p in players if id(p) not in chosen_ids]
+        gap = max(0, position_pool_size(slot) - len(players))
+        status_cls = "d-ok" if not bench else "d-short"
         names = "、".join(
-            f"{p['name']}(EA{int(round(p['ea']))})" for p in players[:target]
-        ) or "无"
-        extra = "" if have <= target else f" 等 {have} 人"
+            f"{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})" for p in bench
+        ) or "全部入选主力"
         rows.append(
             f"<div class='d-row {status_cls}'>"
             f"<div class='d-head'><span class='d-slot'>{slot}</span>"
-            f"<span class='d-count'>{have}/{target}</span>"
+            f"<span class='d-count'>池{len(players)}人 · 替补{len(bench)}</span>"
             f"{('<span class=\'d-gap\'>缺 ' + str(gap) + ' 人</span>') if gap else ''}</div>"
-            f"<div class='d-players'>{names}{extra}</div>"
+            f"<div class='d-players'>{names}</div>"
             f"</div>"
         )
     return "<div class='remaining'>" + "".join(rows) + "</div>"
@@ -504,7 +499,6 @@ def generate_full_html(
     ea_second,
     depth_html=None,
     ratio=0.9,
-    ca_threshold=None,
 ):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
@@ -521,27 +515,10 @@ def generate_full_html(
         )
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
         .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
-        .replace(
-            "{{CA_THRESHOLD}}",
-            str(int(round(ca_threshold))) if ca_threshold is not None else "",
-        )
     )
 
 
 # ── Main flow ──────────────────────────────────────────────
-def compute_ca_threshold(candidates: List[dict]) -> int:
-    """门槛 = 除门将外按 CA 降序第 30 人的 CA；不足 30 人取最低者。
-
-    门将单独算（GK 是独立位置，不占外场名额），所以外场球员排到第 30 名
-    的 CA 作为"值得进入阵容深度分析"的下限。
-    """
-    field = [p for p in candidates if "GK" not in parse_position_tokens(p["position"])]
-    field.sort(key=lambda p: p["ca"], reverse=True)
-    if not field:
-        return 0
-    return field[min(29, len(field) - 1)]["ca"]
-
-
 def analyze(
     roster: List[dict],
     output: Optional[Path] = None,
@@ -569,21 +546,23 @@ def analyze(
         print("未找到阵容数据")
         return None
 
-    # 门槛 = 除门将外按 CA 降序第 30 人的 CA，低于门槛的球员不纳入 EA 计算
-    ca_threshold = compute_ca_threshold(candidates)
-    # 全部球员都算 EA（替补表也展示 EA），但 EA 22 人阵容只从达门槛者中选
+    # 全部球员都算 EA
     calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
-    ea_candidates = [p for p in candidates if p["ca"] >= ca_threshold]
-    ea_first, ea_second = select_squad(ea_candidates, "ea")
 
-    # 替补表：全队按位置统计有熟练度球员（不过滤门槛），看深度缺口
-    depth = compute_position_depth(candidates)
-    depth_html = render_depth_table(depth)
+    # 位置池：每位置取 CA 前 N 人（GK3 / 双槽6 / 单槽4），球员可重复
+    pool = compute_position_pool(candidates)
+    pool_players = {id(p): p for players in pool.values() for p in players}
+    pool_list = list(pool_players.values())
+
+    # 匈牙利算法从池子里选 22 人（首发 + 替补）
+    ea_first, ea_second = select_squad(pool_list, "ea")
+    chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
+
+    # 替补表：池子里非主力（未入选 22 人）的球员
+    depth_html = render_depth_table(pool, chosen_ids)
 
     # 只翻译最终出现在网页（入选阵容 + 替补表）里的球员名字，避免多余请求
-    depth_players = [
-        p for info in depth.values() for p in info["players"]
-    ]
+    depth_players = list(pool_players.values())
     _translate_xi_names(ea_first, ea_second, depth_players, translate=translate)
 
     html = generate_full_html(
@@ -591,7 +570,6 @@ def analyze(
         ea_second,
         depth_html=depth_html,
         ratio=ratio,
-        ca_threshold=ca_threshold,
     )
     out = output or OUTPUT
     out.write_text(html, encoding="utf-8")
