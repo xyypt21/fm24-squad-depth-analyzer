@@ -428,7 +428,26 @@ def select_squad(candidates: List[dict], key: str):
     return ea_first, ea_second
 
 
-def generate_full_html(ea_first, ea_second, ratio=0.9, ca_threshold=None):
+def render_remaining_list(players: List[dict]) -> str:
+    """渲染右侧"剩余能力前11"：按 CA 排序的未入选球员列表。"""
+    if not players:
+        return "<div class='remaining'>无剩余球员</div>"
+    rows = []
+    for rank, p in enumerate(players, 1):
+        rows.append(
+            f"<div class='r-row'>"
+            f"<span class='r-rank'>{rank}</span>"
+            f"<span class='r-name'>{p['name']}</span>"
+            f"<span class='r-pos'>{p['position']}</span>"
+            f"<span class='r-stat'>CA{p['ca']}</span>"
+            f"</div>"
+        )
+    return "<div class='remaining'>" + "".join(rows) + "</div>"
+
+
+def generate_full_html(
+    ea_first, ea_second, remaining=None, ratio=0.9, ca_threshold=None
+):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
     css = (template_dir / "style.css").read_text(encoding="utf-8")
@@ -437,6 +456,10 @@ def generate_full_html(ea_first, ea_second, ratio=0.9, ca_threshold=None):
         .replace(
             "{{PITCH_22}}",
             render_pitch_22_card(ea_first, ea_second, "ea", ratio),
+        )
+        .replace(
+            "{{REMAINING_PLAYERS}}",
+            render_remaining_list(remaining or []),
         )
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
         .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
@@ -494,12 +517,21 @@ def analyze(
     calculate_ea(ea_candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
     ea_first, ea_second = select_squad(ea_candidates, "ea")
 
-    # 只翻译最终出现在网页（入选 EA 阵容）里的球员名字，避免多余请求
-    _translate_xi_names(ea_first, ea_second, translate=translate)
+    # 剩余球员 = 达门槛但未入选 EA 22 人者，按 CA 排序取前 11
+    chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
+    remaining = sorted(
+        (p for p in ea_candidates if id(p) not in chosen_ids),
+        key=lambda p: p["ca"],
+        reverse=True,
+    )[:11]
+
+    # 只翻译最终出现在网页（入选阵容 + 剩余榜）里的球员名字，避免多余请求
+    _translate_xi_names(ea_first, ea_second, remaining, translate=translate)
 
     html = generate_full_html(
         ea_first,
         ea_second,
+        remaining=remaining,
         ratio=ratio,
         ca_threshold=ca_threshold,
     )
