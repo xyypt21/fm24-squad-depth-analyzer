@@ -307,7 +307,7 @@ def render_player_slot(slot_name, player, sort_key, reference_value):
         f"<div class='slot{weak}'>"
         f"<div class='slot-label'>{slot_name}</div>"
         f"<div class='p-name'>{player['name']}</div>"
-        f"<div class='p-stat'>{player['age']}岁 · CA{player['ca']} · EA{player['ea']:.0f}</div>"
+        f"<div class='p-stat'>{player['age']:.1f}岁 · CA{player['ca']} · EA{player['ea']:.0f}</div>"
         f"</div>"
     )
 
@@ -351,9 +351,15 @@ def generate_full_html(ca_first, ca_second, ea_first, ea_second):
     return (
         template.replace("{{CSS_STYLE}}", css)
         .replace("{{PITCH_CA_BEST}}", render_pitch_card(ca_first, "ca"))
-        .replace("{{PITCH_CA_SECOND}}", render_pitch_card(ca_second, "ca"))
+        .replace(
+            "{{PITCH_CA_SECOND}}",
+            render_pitch_card(ca_second, "ca", reference=compute_average(ca_first, "ca")),
+        )
         .replace("{{PITCH_EA_BEST}}", render_pitch_card(ea_first, "ea"))
-        .replace("{{PITCH_EA_SECOND}}", render_pitch_card(ea_second, "ea"))
+        .replace(
+            "{{PITCH_EA_SECOND}}",
+            render_pitch_card(ea_second, "ea", reference=compute_average(ea_first, "ea")),
+        )
         .replace("{{AVG_CA_BEST}}", str(compute_average(ca_first, "ca")))
         .replace("{{AVG_CA_SECOND}}", str(compute_average(ca_second, "ca")))
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))

@@ -95,11 +95,12 @@ def refresh_game_date(mem):
 
 
 def calc_age(birth_date):
-    """按游戏日期 GAME_DATE 计算精确周岁（与 FM Scouting Tool 一致）。
+    """按游戏日期 GAME_DATE 计算年龄，保留 1 位小数。
 
-    FM Scouting Tool 的 calcAgeNum(birthDateStr)：
+    整数部分与 FM Scouting Tool 一致：
       age = gameY - birthY
       若 生日(月,日) 晚于 游戏日期(月,日)，则 age -= 1（未满周岁）
+    小数部分 = 距上一次生日的天数 / 365.25（近似，1 位小数）。
     birth_date: datetime.date 或 None。
     """
     if not birth_date:
@@ -110,7 +111,14 @@ def calc_age(birth_date):
         age = GAME_DATE.year - birth_date.year
         if (GAME_DATE.month, GAME_DATE.day) < (birth_date.month, birth_date.day):
             age -= 1
-        return age
+        if age < 0:
+            return None
+        try:
+            last_birthday = birth_date.replace(year=birth_date.year + age)
+        except ValueError:
+            last_birthday = birth_date.replace(year=birth_date.year + age, day=28)
+        fraction = (GAME_DATE - last_birthday).days / 365.25
+        return round(age + fraction, 1)
     except Exception:
         return None
 
