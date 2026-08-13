@@ -546,24 +546,26 @@ def analyze(
         print("未找到阵容数据")
         return None
 
+    # 按年龄过滤（默认 >= 17 岁）
+    candidates = [p for p in candidates if p["age"] >= min_age]
+    if not candidates:
+        print("没有符合年龄要求的球员")
+        return None
+
     # 全部球员都算 EA
     calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
 
-    # 位置池：每位置取 CA 前 N 人（GK3 / 双槽6 / 单槽4），球员可重复
-    pool = compute_position_pool(candidates)
-    pool_players = {id(p): p for players in pool.values() for p in players}
-    pool_list = list(pool_players.values())
-
-    # 匈牙利算法从池子里选 22 人（首发 + 替补）
-    ea_first, ea_second = select_squad(pool_list, "ea")
+    # 匈牙利算法从全部达龄球员里选 22 人（首发 + 替补）
+    ea_first, ea_second = select_squad(candidates, "ea")
     chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
 
-    # 替补表：池子里非主力（未入选 22 人）的球员
+    # 替补表：位置池（每位置 CA 前 N 人）里的非主力（未入选 22 人）
+    pool = compute_position_pool(candidates)
     depth_html = render_depth_table(pool, chosen_ids)
 
     # 只翻译最终出现在网页（入选阵容 + 替补表）里的球员名字，避免多余请求
-    depth_players = list(pool_players.values())
-    _translate_xi_names(ea_first, ea_second, depth_players, translate=translate)
+    pool_players = [p for players in pool.values() for p in players]
+    _translate_xi_names(ea_first, ea_second, pool_players, translate=translate)
 
     html = generate_full_html(
         ea_first,
