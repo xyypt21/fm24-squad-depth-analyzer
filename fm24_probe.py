@@ -24,7 +24,6 @@ import glob
 import json
 import os
 import sys
-import tempfile
 from ctypes import wintypes as wt
 from pathlib import Path
 
@@ -397,51 +396,17 @@ def _club_name(mem, club_entry):
     return _read_len_str(mem, np)
 
 
-# ── 记录段缓存（跨运行复用，游戏未重启时地址稳定，免全内存扫描）──
-_REC_CACHE_PATH = Path(tempfile.gettempdir()) / "fm24_record_segments.json"
-
-
-def _cached_segments(mem):
-    """尝试从磁盘缓存读记录段列表并校验；无效返回 None。"""
-    try:
-        if not _REC_CACHE_PATH.exists():
-            return None
-        data = json.loads(_REC_CACHE_PATH.read_text(encoding="utf-8"))
-        pid = data.get("pid")
-        if pid != mem.pid:
-            return None
-        segs = data.get("segments")
-        if not segs:
-            return None
-        # 校验每段首条记录签名仍有效
-        for start, count in segs[:5]:
-            if mem.read_u32(start) != 0x45A4E958:
-                return None
-            if count > 1 and mem.read_u32(start + PLAYER_STRIDE) != 0x45A4E958:
-                return None
-        return segs
-    except Exception:
-        return None
-
-
-def _save_segment_cache(mem, segs):
-    with contextlib.suppress(Exception):
-        _REC_CACHE_PATH.write_text(json.dumps({"pid": mem.pid, "segments": segs}), encoding="utf-8")
+# ── 记录段（每次全量扫描，不做跨进程磁盘缓存）───────────────
+# 曾用磁盘缓存复用段列表（游戏未重启时地址稳定），但缓存校验只查前 5 段
+# 签名，游戏内重载存档/球员数组重建后，旧地址残留数据仍能通过签名校验，
+# 导致用过期段列表漏读球员（如整批一线队消失）。全量扫描实测约 3 秒，
+# 准确性优先，故每次重新扫描。
 
 
 def scan_player_segments(mem):
-    """返回记录段列表 [(start, count), ...]，优先用跨运行缓存。
-
-    游戏未重启/未重载存档时，记录段地址稳定；缓存命中即可完全跳过
-    全内存扫描（4GB 读取 → 只校验几条签名）。
-    """
-    cached = _cached_segments(mem)
-    if cached is not None:
-        return cached
+    """返回记录段列表 [(start, count), ...]，每次全量扫描。"""
     recs = scan_player_records(mem)
-    segs = _record_segments(recs)
-    _save_segment_cache(mem, segs)
-    return segs
+    return _record_segments(recs)
 
 
 def scan_player_records(mem):
