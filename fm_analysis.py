@@ -31,7 +31,7 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 DEFAULT_CONFIG: Dict[str, Any] = {
     "club_uid": 920,
     "min_age": 17,
-    "ca_ratio": 0.7,
+    "ca_threshold": 100,
     "growth_until_age": 21,
     "growth_per_year": 20,
     "translate_names": False,
@@ -53,7 +53,7 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
     return {
         "club_uid": int(merged["club_uid"]),
         "min_age": int(merged["min_age"]),
-        "ca_ratio": float(merged["ca_ratio"]),
+        "ca_threshold": int(merged["ca_threshold"]),
         "growth_until_age": int(merged["growth_until_age"]),
         "growth_per_year": int(merged["growth_per_year"]),
         "translate_names": bool(merged["translate_names"]),
@@ -428,7 +428,7 @@ def select_squad(candidates: List[dict], key: str):
     return ea_first, ea_second
 
 
-def generate_full_html(ea_first, ea_second, ca_first, ca_second, ratio=0.9, ca_threshold=None):
+def generate_full_html(ea_first, ea_second, ratio=0.9, ca_threshold=None):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
     css = (template_dir / "style.css").read_text(encoding="utf-8")
@@ -452,7 +452,7 @@ def analyze(
     roster: List[dict],
     output: Optional[Path] = None,
     min_age: int = 17,
-    ca_ratio: float = 0.7,
+    ca_threshold: int = 100,
     growth_until_age: int = 21,
     growth_per_year: int = 20,
     translate: bool = True,
@@ -464,7 +464,7 @@ def analyze(
     roster: list of player dicts, each with name/age/position/ca/pa.
     output: HTML output path, defaults to OUTPUT.
     min_age: only players aged >= min_age are considered (default 17).
-    ca_ratio: EA 候选门槛 = CA 匈牙利 22 人人均 CA × 该比例 (default 0.7).
+    ca_threshold: EA 候选门槛 = 手动输入的 CA 值，CA 低于门槛的球员不纳入 (default 100).
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     translate: translate selected player names to Chinese (default True).
@@ -477,11 +477,7 @@ def analyze(
         print("未找到阵容数据")
         return None
 
-    # 门槛 = CA 匈牙利算法选出 22 人的人均 CA × ca_ratio
-    ca_first, ca_second = select_squad(candidates, "ca")
-    ca_threshold = compute_average(ca_first + ca_second, "ca") * ca_ratio
-
-    # EA 图候选：CA 低于门槛的一律不纳入 EA 计算
+    # EA 图候选：CA 低于手动门槛的一律不纳入 EA 计算
     ea_candidates = [p for p in candidates if p["ca"] >= ca_threshold]
     calculate_ea(ea_candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
     ea_first, ea_second = select_squad(ea_candidates, "ea")
@@ -492,8 +488,6 @@ def analyze(
     html = generate_full_html(
         ea_first,
         ea_second,
-        ca_first,
-        ca_second,
         ratio=ratio,
         ca_threshold=ca_threshold,
     )
