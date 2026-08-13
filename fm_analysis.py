@@ -469,24 +469,35 @@ def compute_position_pool(candidates: List[dict]) -> Dict[str, List[dict]]:
 
 
 def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
-    """渲染替补表：每个位置列出池子中"非主力"（未入选 22 人）的球员。
+    """渲染替补表：每个位置列出池子中全部球员，标注主力/非主力。
 
+    主力 = 入选匈牙利 22 人（chosen_ids），加粗高亮；
+    非主力 = 池子里未入选的替补。
     chosen_ids: 匈牙利算法选出的 22 人 id 集合。
     """
     if not pool:
         return "<div class='remaining'>无数据</div>"
     rows = []
     for slot, players in pool.items():
+        mains = [p for p in players if id(p) in chosen_ids]
         bench = [p for p in players if id(p) not in chosen_ids]
         gap = max(0, position_pool_size(slot) - len(players))
-        status_cls = "d-ok" if not bench else "d-short"
-        names = "、".join(
+        status_cls = "d-ok" if not gap else "d-short"
+        main_text = "、".join(
+            f"<span class='d-main'>{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})</span>"
+            for p in mains
+        )
+        bench_text = "、".join(
             f"{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})" for p in bench
-        ) or "全部入选主力"
+        )
+        if main_text and bench_text:
+            names = main_text + "、" + bench_text
+        else:
+            names = main_text or bench_text or "无"
         rows.append(
             f"<div class='d-row {status_cls}'>"
             f"<div class='d-head'><span class='d-slot'>{slot}</span>"
-            f"<span class='d-count'>池{len(players)}人 · 替补{len(bench)}</span>"
+            f"<span class='d-count'>池{len(players)}人 · 主力{len(mains)} · 替补{len(bench)}</span>"
             f"{('<span class=\'d-gap\'>缺 ' + str(gap) + ' 人</span>') if gap else ''}</div>"
             f"<div class='d-players'>{names}</div>"
             f"</div>"

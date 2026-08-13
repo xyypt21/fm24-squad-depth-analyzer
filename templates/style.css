@@ -39,3 +39,4 @@ html,body { height:100%; font-family:"Microsoft YaHei","Segoe UI",sans-serif; ba
 .d-ok { border-color:#e5e5e5; }
 .d-short { border-color:#e8b4b4; background:#fdf6f6; }
 .d-players { font-size:12px; color:#555; line-height:1.6; }
+.d-main { font-weight:bold; color:#1a5276; }
