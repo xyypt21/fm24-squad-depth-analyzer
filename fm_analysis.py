@@ -478,6 +478,9 @@ def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
     rows = []
     for slot, players in pool.items():
         bench = [p for p in players if id(p) not in chosen_ids]
+        # 无替补的位置不显示
+        if not bench:
+            continue
         gap = max(0, position_pool_size(slot) - len(players))
         status_cls = "d-ok" if not gap else "d-short"
         names = "、".join(
@@ -491,6 +494,8 @@ def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
             f"<div class='d-players'>{names}</div>"
             f"</div>"
         )
+    if not rows:
+        return "<div class='remaining'>无替补球员</div>"
     return "<div class='remaining'>" + "".join(rows) + "</div>"
 
 
