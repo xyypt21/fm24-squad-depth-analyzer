@@ -524,13 +524,14 @@ def analyze(
 
     # 门槛 = 除门将外按 CA 降序第 30 人的 CA，低于门槛的球员不纳入 EA 计算
     ca_threshold = compute_ca_threshold(candidates)
+    # 全部球员都算 EA（剩余榜也展示 EA），但 EA 22 人阵容只从达门槛者中选
+    calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
     ea_candidates = [p for p in candidates if p["ca"] >= ca_threshold]
-    calculate_ea(ea_candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
     ea_first, ea_second = select_squad(ea_candidates, "ea")
 
-    # 剩余球员 = 达门槛但未入选 EA 22 人者，分别按 CA、EA 排序取前 11
+    # 剩余球员 = 未入选 EA 22 人的全部球员（不过滤门槛），分别按 CA、EA 排序取前 11
     chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
-    remaining_all = [p for p in ea_candidates if id(p) not in chosen_ids]
+    remaining_all = [p for p in candidates if id(p) not in chosen_ids]
     remaining_ca = sorted(remaining_all, key=lambda p: p["ca"], reverse=True)[:11]
     remaining_ea = sorted(remaining_all, key=lambda p: p["ea"], reverse=True)[:11]
 
