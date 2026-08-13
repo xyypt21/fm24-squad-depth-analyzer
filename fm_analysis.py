@@ -439,7 +439,9 @@ def render_remaining_list(players: List[dict]) -> str:
             f"<span class='r-rank'>{rank}</span>"
             f"<span class='r-name'>{p['name']}</span>"
             f"<span class='r-pos'>{p['position']}</span>"
+            f"<span class='r-age'>{p['age']:.0f}岁</span>"
             f"<span class='r-stat'>CA{p['ca']}</span>"
+            f"<span class='r-ea'>EA{p['ea']:.0f}</span>"
             f"</div>"
         )
     return "<div class='remaining'>" + "".join(rows) + "</div>"
