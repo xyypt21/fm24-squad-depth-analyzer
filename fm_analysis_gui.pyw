@@ -23,7 +23,7 @@ class FmGui:
     def __init__(self, root):
         self.root = root
         root.title("FM2024 阵容厚度分析")
-        root.geometry("720x520")
+        root.geometry("720x570")
         root.minsize(640, 420)
 
         pad = {"padx": 6, "pady": 4}
@@ -57,11 +57,26 @@ class FmGui:
             side="left"
         )
 
+        thr_row = ttk.Frame(frm)
+        thr_row.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
+        self.ratio_best_var = tk.StringVar(value=str(self._config.get("ratio_best", 0.9)))
+        self.ratio_second_var = tk.StringVar(value=str(self._config.get("ratio_second", 0.85)))
+        self.ratio_third_var = tk.StringVar(value=str(self._config.get("ratio_third", 0.8)))
+        ttk.Label(thr_row, text="阈值(相对最佳11人均EA):").pack(side="left")
+        ttk.Label(thr_row, text="最佳:").pack(side="left", padx=(6, 0))
+        ttk.Entry(thr_row, textvariable=self.ratio_best_var, width=5).pack(side="left")
+        ttk.Label(thr_row, text="次佳:").pack(side="left", padx=(6, 0))
+        ttk.Entry(thr_row, textvariable=self.ratio_second_var, width=5).pack(side="left")
+        ttk.Label(thr_row, text="第三:").pack(side="left", padx=(6, 0))
+        ttk.Entry(thr_row, textvariable=self.ratio_third_var, width=5).pack(side="left")
+
         club2_row = ttk.Frame(frm)
-        club2_row.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
+        club2_row.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
         self.compare_var = tk.BooleanVar(value=bool(self._config.get("merge_club2", False)))
         self.club2_var = tk.StringVar(
-            value=str(self._config.get("club2_uid", 0) or 0) if self._config.get("club2_uid") else ""
+            value=str(self._config.get("club2_uid", 0) or 0)
+            if self._config.get("club2_uid")
+            else ""
         )
         ttk.Checkbutton(
             club2_row, text="合并第二俱乐部", variable=self.compare_var, command=self._toggle_club2
@@ -72,30 +87,30 @@ class FmGui:
 
         self.formula_var = tk.StringVar()
         ttk.Label(frm, textvariable=self.formula_var, foreground="#555", justify="left").grid(
-            row=4, column=0, columnspan=3, sticky="w", **pad
+            row=5, column=0, columnspan=3, sticky="w", **pad
         )
         self._update_formula()
         self.ea_age_var.trace_add("write", lambda *_: self._update_formula())
         self.ea_growth_var.trace_add("write", lambda *_: self._update_formula())
 
         btn_row = ttk.Frame(frm)
-        btn_row.grid(row=5, column=0, columnspan=3, sticky="ew", **pad)
+        btn_row.grid(row=6, column=0, columnspan=3, sticky="ew", **pad)
         self.run_btn = ttk.Button(btn_row, text="开始分析", command=self.start_analysis)
         self.run_btn.pack(side="left")
         ttk.Button(btn_row, text="退出", command=root.destroy).pack(side="right")
 
         self.log = tk.Text(frm, height=14, state="disabled", wrap="word")
-        self.log.grid(row=6, column=0, columnspan=3, sticky="nsew", **pad)
+        self.log.grid(row=7, column=0, columnspan=3, sticky="nsew", **pad)
         scroll = ttk.Scrollbar(frm, command=self.log.yview)
-        scroll.grid(row=6, column=3, sticky="ns")
+        scroll.grid(row=7, column=3, sticky="ns")
         self.log.configure(yscrollcommand=scroll.set)
 
         frm.columnconfigure(1, weight=1)
-        frm.rowconfigure(6, weight=1)
+        frm.rowconfigure(7, weight=1)
 
         self.status = tk.StringVar(value="就绪")
         ttk.Label(frm, textvariable=self.status).grid(
-            row=7, column=0, columnspan=3, sticky="w", **pad
+            row=8, column=0, columnspan=3, sticky="w", **pad
         )
 
     def log_line(self, text):
@@ -115,6 +130,12 @@ class FmGui:
 
     def _get_club_uid(self):
         return int(self.club_var.get())
+
+    def _parse_ratio(self, raw):
+        value = float(raw)
+        if not 0 < value <= 1:
+            raise ValueError
+        return value
 
     def _refresh_club2_state(self):
         """按复选框启用/禁用第二俱乐部输入控件。"""
@@ -140,8 +161,13 @@ class FmGui:
             growth_per_year = int(self.ea_growth_var.get())
             if min_age <= 0 or growth_until_age <= 0 or growth_per_year < 0:
                 raise ValueError
+            ratio_best = self._parse_ratio(self.ratio_best_var.get())
+            ratio_second = self._parse_ratio(self.ratio_second_var.get())
+            ratio_third = self._parse_ratio(self.ratio_third_var.get())
         except ValueError:
-            messagebox.showerror("错误", "参数必须是正整数（每年成长可为 0）。")
+            messagebox.showerror(
+                "错误", "参数必须是正整数（每年成长可为 0），阈值必须在 0~1 之间。"
+            )
             return
 
         club2_uid = None
@@ -165,6 +191,9 @@ class FmGui:
                 "translate_names": self.translate_var.get(),
                 "merge_club2": bool(self.compare_var.get()),
                 "club2_uid": club2_uid or 0,
+                "ratio_best": ratio_best,
+                "ratio_second": ratio_second,
+                "ratio_third": ratio_third,
             }
         )
         self.run_btn.configure(state="disabled")
@@ -176,6 +205,10 @@ class FmGui:
         self.log_line(
             f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
         )
+        self.log_line(
+            "阈值(相对最佳均EA): "
+            f"最佳{ratio_best:.0%} / 次佳{ratio_second:.0%} / 第三{ratio_third:.0%}"
+        )
         self.log_line(f"翻译球员名字: {'开启' if self.translate_var.get() else '关闭'}")
         thread = threading.Thread(
             target=self._analyze,
@@ -186,12 +219,26 @@ class FmGui:
                 growth_until_age,
                 growth_per_year,
                 self.translate_var.get(),
+                ratio_best,
+                ratio_second,
+                ratio_third,
             ),
             daemon=True,
         )
         thread.start()
 
-    def _analyze(self, club_uid, club2_uid, min_age, growth_until_age, growth_per_year, translate):
+    def _analyze(
+        self,
+        club_uid,
+        club2_uid,
+        min_age,
+        growth_until_age,
+        growth_per_year,
+        translate,
+        ratio_best,
+        ratio_second,
+        ratio_third,
+    ):
         try:
             name2 = None
             if club2_uid is None:
@@ -220,6 +267,9 @@ class FmGui:
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
                 translate=translate,
+                ratio_best=ratio_best,
+                ratio_second=ratio_second,
+                ratio_third=ratio_third,
             )
             if html:
                 message = f"完成：{club_text}{detail}，结果已写入 {OUTPUT}"

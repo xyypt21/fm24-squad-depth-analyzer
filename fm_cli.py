@@ -27,6 +27,9 @@ def main() -> None:
         min_age=config["min_age"],
         growth_until_age=config["growth_until_age"],
         growth_per_year=config["growth_per_year"],
+        ratio_best=config["ratio_best"],
+        ratio_second=config["ratio_second"],
+        ratio_third=config["ratio_third"],
     )
     if not html:
         sys.exit(1)

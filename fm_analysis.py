@@ -2,8 +2,10 @@
 FM2024 4-2-3-1 squad depth analysis core.
 
 Computes EA (Expected Ability) for every player and uses the Hungarian algorithm
-to pick the best and second-best starting XI for both CA and EA, then renders
-an HTML report. Also loads/saves the config file, parses FM position strings,
+to pick the three best non-overlapping starting XIs by EA, then renders an HTML
+report. Weak-slot highlighting uses the first XI's average EA as reference,
+at 90% / 85% / 80% for the three XIs respectively. Also
+loads/saves the config file, parses FM position strings,
 and optionally translates selected player names to Chinese.
 
 EA (Expected Ability) = CA + growth potential
@@ -31,6 +33,9 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "translate_names": False,
     "merge_club2": False,
     "club2_uid": 0,
+    "ratio_best": 0.9,
+    "ratio_second": 0.85,
+    "ratio_third": 0.8,
 }
 
 
@@ -51,6 +56,9 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
         "translate_names": bool(merged["translate_names"]),
         "merge_club2": bool(merged["merge_club2"]),
         "club2_uid": int(merged["club2_uid"]),
+        "ratio_best": float(merged["ratio_best"]),
+        "ratio_second": float(merged["ratio_second"]),
+        "ratio_third": float(merged["ratio_third"]),
     }
 
 
@@ -296,13 +304,13 @@ def compute_average(xi, sort_key):
     return int(sum(p[sort_key] for _, p in xi) / len(xi)) if xi else 0
 
 
-def is_weak(player_ea, ref):
-    return player_ea < ref * 0.9
+def is_weak(player_ea, reference, ratio):
+    return player_ea < reference * ratio
 
 
-def render_player_slot(slot_name, player, sort_key, reference_value):
+def render_player_slot(slot_name, player, sort_key, reference_value, ratio):
     """Render the HTML for a single player slot."""
-    weak = " slot-weak" if is_weak(player[sort_key], reference_value) else ""
+    weak = " slot-weak" if is_weak(player[sort_key], reference_value, ratio) else ""
     return (
         f"<div class='slot{weak}'>"
         f"<div class='slot-label'>{slot_name}</div>"
@@ -312,7 +320,7 @@ def render_player_slot(slot_name, player, sort_key, reference_value):
     )
 
 
-def render_pitch(xi, sort_key, reference_value):
+def render_pitch(xi, sort_key, reference_value, ratio):
     """
     Render the 11-man pitch diagram.
     Row layout: STC / AML,AMC,AMR / DMC,DMC / DL,DC,DC,DR / GK
@@ -322,7 +330,7 @@ def render_pitch(xi, sort_key, reference_value):
         if index >= len(xi):
             return "<div class='slot' style='visibility:hidden;'></div>"
         slot_name, player = xi[index]
-        return render_player_slot(slot_name, player, sort_key, reference_value)
+        return render_player_slot(slot_name, player, sort_key, reference_value, ratio)
 
     row_indices = [(10,), (7, 8, 9), (5, 6), (1, 2, 3, 4), (0,)]
     rows = [
@@ -332,7 +340,7 @@ def render_pitch(xi, sort_key, reference_value):
     return "\n".join(rows)
 
 
-def render_pitch_card(xi, sort_key, reference=None):
+def render_pitch_card(xi, sort_key, reference=None, ratio=0.9):
     """Render a full pitch card."""
     average = compute_average(xi, sort_key)
     if not xi:
@@ -341,29 +349,38 @@ def render_pitch_card(xi, sort_key, reference=None):
             "justify-content:center;color:rgba(255,255,255,0.5);font-size:14px;'>"
             "球员不足</div>"
         )
-    return f"<div class='pitch'>{render_pitch(xi, sort_key, reference or average)}</div>"
+    return f"<div class='pitch'>{render_pitch(xi, sort_key, reference or average, ratio)}</div>"
 
 
-def generate_full_html(ca_first, ca_second, ea_first, ea_second):
+def generate_full_html(
+    ea_first,
+    ea_second,
+    ea_third,
+    ratio_best=0.9,
+    ratio_second=0.85,
+    ratio_third=0.8,
+):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
     css = (template_dir / "style.css").read_text(encoding="utf-8")
+    ref_ea = compute_average(ea_first, "ea")
     return (
         template.replace("{{CSS_STYLE}}", css)
-        .replace("{{PITCH_CA_BEST}}", render_pitch_card(ca_first, "ca"))
         .replace(
-            "{{PITCH_CA_SECOND}}",
-            render_pitch_card(ca_second, "ca", reference=compute_average(ca_first, "ca")),
+            "{{PITCH_EA_BEST}}",
+            render_pitch_card(ea_first, "ea", reference=ref_ea, ratio=ratio_best),
         )
-        .replace("{{PITCH_EA_BEST}}", render_pitch_card(ea_first, "ea"))
         .replace(
             "{{PITCH_EA_SECOND}}",
-            render_pitch_card(ea_second, "ea", reference=compute_average(ea_first, "ea")),
+            render_pitch_card(ea_second, "ea", reference=ref_ea, ratio=ratio_second),
         )
-        .replace("{{AVG_CA_BEST}}", str(compute_average(ca_first, "ca")))
-        .replace("{{AVG_CA_SECOND}}", str(compute_average(ca_second, "ca")))
+        .replace(
+            "{{PITCH_EA_THIRD}}",
+            render_pitch_card(ea_third, "ea", reference=ref_ea, ratio=ratio_third),
+        )
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
         .replace("{{AVG_EA_SECOND}}", str(compute_average(ea_second, "ea")))
+        .replace("{{AVG_EA_THIRD}}", str(compute_average(ea_third, "ea")))
     )
 
 
@@ -375,16 +392,21 @@ def analyze(
     growth_until_age: int = 21,
     growth_per_year: int = 20,
     translate: bool = True,
+    ratio_best: float = 0.9,
+    ratio_second: float = 0.85,
+    ratio_third: float = 0.8,
 ) -> Optional[str]:
     """
-    Core analysis flow: compute EA, pick the best and second-best XI for both
-    CA (current ability) and EA (expected ability).
+    Core analysis flow: compute EA, then pick the three best non-overlapping
+    starting XIs by EA.
     roster: list of player dicts, each with name/age/position/ca/pa.
     output: HTML output path, defaults to OUTPUT.
     min_age: only players aged >= min_age are considered (default 17).
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     translate: translate selected player names to Chinese (default True).
+    ratio_best/second/third: weak-slot threshold as a fraction of the first
+    XI's average EA (defaults 0.9 / 0.85 / 0.8).
     Returns the HTML string, or None if roster is empty.
     """
     candidates = [p for p in roster if p["age"] >= min_age]
@@ -394,18 +416,23 @@ def analyze(
 
     calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
 
-    ca_first = select_best_xi(candidates, "ca")
-    used_ca = {id(p) for _, p in ca_first}
-    ca_second = select_best_xi([p for p in candidates if id(p) not in used_ca], "ca")
-
     ea_first = select_best_xi(candidates, "ea")
     used_ea = {id(p) for _, p in ea_first}
     ea_second = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
+    used_ea |= {id(p) for _, p in ea_second}
+    ea_third = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
 
     # 只翻译最终出现在网页（入选阵容）里的球员名字，避免多余请求
-    _translate_xi_names(ca_first, ca_second, ea_first, ea_second, translate=translate)
+    _translate_xi_names(ea_first, ea_second, ea_third, translate=translate)
 
-    html = generate_full_html(ca_first, ca_second, ea_first, ea_second)
+    html = generate_full_html(
+        ea_first,
+        ea_second,
+        ea_third,
+        ratio_best=ratio_best,
+        ratio_second=ratio_second,
+        ratio_third=ratio_third,
+    )
     out = output or OUTPUT
     out.write_text(html, encoding="utf-8")
     return html
