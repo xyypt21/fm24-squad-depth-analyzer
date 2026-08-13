@@ -52,9 +52,9 @@ class FmGui:
 
         thr_row = ttk.Frame(frm)
         thr_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
-        self.ca_ratio_var = tk.StringVar(value=str(self._config.get("ca_ratio", 0.8)))
+        self.ca_ratio_var = tk.StringVar(value=str(self._config.get("ca_ratio", 0.7)))
         self.ratio_var = tk.StringVar(value=str(self._config.get("ratio_best", 0.9)))
-        ttk.Label(thr_row, text="CA阈值:").pack(side="left")
+        ttk.Label(thr_row, text="门槛阈值:").pack(side="left")
         ttk.Entry(thr_row, textvariable=self.ca_ratio_var, width=5).pack(side="left", padx=(0, 10))
         ttk.Label(thr_row, text="弱项阈值(相对最佳均EA):").pack(side="left")
         ttk.Entry(thr_row, textvariable=self.ratio_var, width=5).pack(side="left", padx=(6, 0))
@@ -63,7 +63,7 @@ class FmGui:
         thr_hint.grid(row=2, column=0, columnspan=3, sticky="ew", **pad)
         ttk.Label(
             thr_hint,
-            text="CA阈值：只统计当前能力不低于(CA图首发均CA×阈值)的球员；"
+            text="门槛：CA匈牙利选出22人的人均CA×门槛阈值，低于门槛的球员不纳入EA；"
             "弱项阈值：EA低于最佳11人均EA×阈值的位置标红。",
             foreground="#555",
             justify="left",
@@ -200,10 +200,10 @@ class FmGui:
             f"俱乐部 ID: {club_uid}" + (f"，合并第二俱乐部 {club2_uid}" if club2_uid else "")
         )
         self.log_line(
-            f"参数: EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}，CA阈值 {ca_ratio:.0%}"
+            f"参数: EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}，门槛阈值 {ca_ratio:.0%}"
         )
         self.log_line(
-            f"阈值(相对最佳均EA): {ratio:.0%}"
+            f"弱项阈值(相对最佳均EA): {ratio:.0%}"
         )
         self.log_line(f"翻译球员名字: {'开启' if self.translate_var.get() else '关闭'}")
         thread = threading.Thread(

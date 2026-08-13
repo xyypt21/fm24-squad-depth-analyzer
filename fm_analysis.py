@@ -31,7 +31,7 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 DEFAULT_CONFIG: Dict[str, Any] = {
     "club_uid": 920,
     "min_age": 17,
-    "ca_ratio": 0.8,
+    "ca_ratio": 0.7,
     "growth_until_age": 21,
     "growth_per_year": 20,
     "translate_names": False,
@@ -346,21 +346,36 @@ def render_player_slot(slot_name, player, sort_key, reference_value, ratio, sub=
 def render_pitch_22(ea_first, ea_second, sort_key, reference, ratio=0.9):
     """Render a single 22-man pitch: each position shows first XI + second XI.
 
-    同一位置的两个球员叠在一个 slot 内（首发实线、替补虚线），
+    同一位置的首发/替补叠在一个 slot 内（首发实线、替补虚线），
     弱项高亮：首发/替补统一按 ratio，均以首发均 EA 为基准。
+    ea_first/ea_second 是按位置归位的 (slot, player) 列表，按 SLOTS 顺序排列，
+    每位置取序列里第 occ 人；某位置替补不足时该槽不渲染替补。
     """
+    # 按位置分组（保持 SLOTS 内的出现顺序）
+    first_by_slot: Dict[str, List[dict]] = {}
+    second_by_slot: Dict[str, List[dict]] = {}
+    for slot_name, p in ea_first:
+        first_by_slot.setdefault(slot_name, []).append(p)
+    for slot_name, p in ea_second:
+        second_by_slot.setdefault(slot_name, []).append(p)
 
     def slot_html(index):
-        if index >= len(ea_first):
+        slot_name = SLOTS[index]
+        occ = sum(1 for j in range(index) if SLOTS[j] == slot_name)
+        firsts = first_by_slot.get(slot_name, [])
+        seconds = second_by_slot.get(slot_name, [])
+        player = firsts[occ] if occ < len(firsts) else None
+        sub_player = seconds[occ] if occ < len(seconds) else None
+        if player is None and sub_player is None:
             return "<div class='slot' style='visibility:hidden;'></div>"
-        slot_name, player = ea_first[index]
-        sub_name, sub_player = ea_second[index]
-        return (
-            f"<div class='slot-stack'>"
-            f"{render_player_slot(slot_name, player, sort_key, reference, ratio)}"
-            f"{render_player_slot(sub_name, sub_player, sort_key, reference, ratio, sub=True)}"
-            f"</div>"
-        )
+        parts = []
+        if player is None:
+            parts.append("<div class='slot' style='visibility:hidden;'></div>")
+        else:
+            parts.append(render_player_slot(slot_name, player, sort_key, reference, ratio))
+        if sub_player is not None:
+            parts.append(render_player_slot(slot_name, sub_player, sort_key, reference, ratio, sub=True))
+        return f"<div class='slot-stack'>" + "".join(parts) + "</div>"
 
     row_indices = [(10,), (7, 8, 9), (5, 6), (1, 2, 3, 4), (0,)]
     rows = [
@@ -437,7 +452,7 @@ def analyze(
     roster: List[dict],
     output: Optional[Path] = None,
     min_age: int = 17,
-    ca_ratio: float = 0.8,
+    ca_ratio: float = 0.7,
     growth_until_age: int = 21,
     growth_per_year: int = 20,
     translate: bool = True,
@@ -449,7 +464,7 @@ def analyze(
     roster: list of player dicts, each with name/age/position/ca/pa.
     output: HTML output path, defaults to OUTPUT.
     min_age: only players aged >= min_age are considered (default 17).
-    ca_ratio: EA 候选门槛 = 首发平均 CA × 该比例，CA 低于门槛的球员不纳入 EA (default 0.8).
+    ca_ratio: EA 候选门槛 = CA 匈牙利 22 人人均 CA × 该比例 (default 0.7).
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     translate: translate selected player names to Chinese (default True).
@@ -462,11 +477,11 @@ def analyze(
         print("未找到阵容数据")
         return None
 
-    # 先算 CA 图（全量候选，无年龄过滤），取首发 11 人平均 CA
+    # 门槛 = CA 匈牙利算法选出 22 人的人均 CA × ca_ratio
     ca_first, ca_second = select_squad(candidates, "ca")
-    ca_threshold = compute_average(ca_first, "ca") * ca_ratio
+    ca_threshold = compute_average(ca_first + ca_second, "ca") * ca_ratio
 
-    # EA 图候选：CA 低于阈值的一律不纳入 EA 计算
+    # EA 图候选：CA 低于门槛的一律不纳入 EA 计算
     ea_candidates = [p for p in candidates if p["ca"] >= ca_threshold]
     calculate_ea(ea_candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
     ea_first, ea_second = select_squad(ea_candidates, "ea")
