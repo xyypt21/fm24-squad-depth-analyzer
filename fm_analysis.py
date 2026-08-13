@@ -34,7 +34,6 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "merge_club2": False,
     "club2_uid": 0,
     "ratio_best": 0.9,
-    "ratio_second": 0.85,
 }
 
 
@@ -56,7 +55,6 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
         "merge_club2": bool(merged["merge_club2"]),
         "club2_uid": int(merged["club2_uid"]),
         "ratio_best": float(merged["ratio_best"]),
-        "ratio_second": float(merged["ratio_second"]),
     }
 
 
@@ -69,6 +67,10 @@ def save_config(config: Dict[str, Any], path: Optional[Path] = None) -> None:
 # ── Formation slots and FM position parsing ──────────────
 # 4-2-3-1 starting XI, ordered top-to-bottom as the pitch is drawn.
 SLOTS: List[str] = ["GK", "DL", "DC", "DC", "DR", "DMC", "DMC", "AML", "AMC", "AMR", "STC"]
+
+# 22 人：每个位置两个槽位（首发 + 替补），一次匈牙利算法整体最优选出。
+# 槽位顺序 = 两套相同阵型，前 11 为首发组、后 11 为替补组；渲染时按 EA 归位。
+SLOTS_22: List[str] = SLOTS + SLOTS
 
 # Valid FM role names and side letters.
 VALID_ROLES: Set[str] = {"GK", "D", "WB", "DM", "M", "AM", "ST"}
@@ -276,29 +278,31 @@ def calculate_ea(
 
 
 # ── Squad selection (Hungarian algorithm) ─────────────────
-def select_best_xi(candidates: List[dict], sort_key: str) -> List[tuple]:
+def select_best_xi(candidates: List[dict], sort_key: str, slots: List[str] = None) -> List[tuple]:
     """
-    Use the Hungarian algorithm to pick the optimal 11-man assignment.
+    Use the Hungarian algorithm to pick the optimal assignment.
 
     Cost design (all positive for stable solving):
       - Valid assignment: max_key - player_key (range 0 to max_key-1)
       - Invalid assignment: far larger than any valid cost sum, so the
         algorithm prefers valid lineups.
+    slots: slot names to fill (default SLOTS, 11 人；传 SLOTS_22 则一次选 22 人)。
     """
-    slot_count = len(SLOTS)
+    slots = slots or SLOTS
+    slot_count = len(slots)
     max_key = max(p[sort_key] for p in candidates) if candidates else 200
     huge_penalty = max_key * slot_count * 2 + 1  # far beyond any valid cost sum
 
     from scipy.optimize import linear_sum_assignment  # noqa: PLC0415 延迟导入，加快启动
 
     cost = np.full((slot_count, len(candidates)), huge_penalty, dtype=np.int32)
-    for slot_i, slot_name in enumerate(SLOTS):
+    for slot_i, slot_name in enumerate(slots):
         for player_i, player in enumerate(candidates):
             if player_can_play(player["position"], slot_name):
                 cost[slot_i, player_i] = max_key - player[sort_key]
 
     row_indices, col_indices = linear_sum_assignment(cost)
-    return [(SLOTS[row], candidates[col]) for row, col in zip(row_indices, col_indices)]
+    return [(slots[row], candidates[col]) for row, col in zip(row_indices, col_indices)]
 
 
 # ── HTML report rendering ─────────────────────────────────
@@ -311,29 +315,37 @@ def is_weak(player_ea, reference, ratio):
     return player_ea < reference * ratio
 
 
-def render_player_slot(slot_name, player, sort_key, reference_value, ratio):
-    """Render the HTML for a single player slot."""
+def render_player_slot(slot_name, player, sort_key, reference_value, ratio, sub=False):
+    """Render the HTML for a single player slot. sub=True 表示替补（次佳）槽位。"""
     weak = " slot-weak" if is_weak(player[sort_key], reference_value, ratio) else ""
+    subcls = " slot-sub" if sub else ""
     return (
-        f"<div class='slot{weak}'>"
-        f"<div class='slot-label'>{slot_name}</div>"
+        f"<div class='slot{weak}{subcls}'>"
+        f"<div class='slot-label'>{slot_name}{'②' if sub else ''}</div>"
         f"<div class='p-name'>{player['name']}</div>"
         f"<div class='p-stat'>{player['age']:.1f}岁 · CA{player['ca']} · EA{player['ea']:.0f}</div>"
         f"</div>"
     )
 
 
-def render_pitch(xi, sort_key, reference_value, ratio):
-    """
-    Render the 11-man pitch diagram.
-    Row layout: STC / AML,AMC,AMR / DMC,DMC / DL,DC,DC,DR / GK
+def render_pitch_22(ea_first, ea_second, sort_key, reference, ratio=0.9):
+    """Render a single 22-man pitch: each position shows first XI + second XI.
+
+    同一位置的两个球员叠在一个 slot 内（首发实线、替补虚线），
+    弱项高亮：首发/替补统一按 ratio，均以首发均 EA 为基准。
     """
 
     def slot_html(index):
-        if index >= len(xi):
+        if index >= len(ea_first):
             return "<div class='slot' style='visibility:hidden;'></div>"
-        slot_name, player = xi[index]
-        return render_player_slot(slot_name, player, sort_key, reference_value, ratio)
+        slot_name, player = ea_first[index]
+        sub_name, sub_player = ea_second[index]
+        return (
+            f"<div class='slot-stack'>"
+            f"{render_player_slot(slot_name, player, sort_key, reference, ratio)}"
+            f"{render_player_slot(sub_name, sub_player, sort_key, reference, ratio, sub=True)}"
+            f"</div>"
+        )
 
     row_indices = [(10,), (7, 8, 9), (5, 6), (1, 2, 3, 4), (0,)]
     rows = [
@@ -343,20 +355,24 @@ def render_pitch(xi, sort_key, reference_value, ratio):
     return "\n".join(rows)
 
 
-def render_pitch_card(xi, sort_key, reference=None, ratio=0.9):
-    """Render a full pitch card."""
-    average = compute_average(xi, sort_key)
-    if not xi:
+def render_pitch_22_card(ea_first, ea_second, sort_key, ratio=0.9):
+    """Render a single 22-man pitch card."""
+    if not ea_first:
         return (
             "<div class='pitch' style='display:flex;align-items:center;"
             "justify-content:center;color:rgba(255,255,255,0.5);font-size:14px;'>"
             "球员不足</div>"
         )
-    return f"<div class='pitch'>{render_pitch(xi, sort_key, reference or average, ratio)}</div>"
+    reference = compute_average(ea_first, sort_key)
+    return (
+        f"<div class='pitch'>"
+        f"{render_pitch_22(ea_first, ea_second, sort_key, reference, ratio)}"
+        f"</div>"
+    )
 
 
 def render_matured_list(players):
-    """Render a simple list of remaining matured players, sorted by EA."""
+    """Render a simple list of remaining matured players, sorted by CA."""
     if not players:
         return "<div class='empty'>无符合条件球员</div>"
     rows = []
@@ -364,25 +380,21 @@ def render_matured_list(players):
         rows.append(
             f"<div class='pl-row'><span class='pl-rank'>{i}</span>"
             f"<span class='pl-name'>{p['name']}</span>"
+            f"<span class='pl-pos'>{p['position']}</span>"
             f"<span class='pl-stat'>{p['age']:.1f}岁 · CA{p['ca']} · EA{p['ea']:.0f}</span></div>"
         )
     return "<div class='player-list'>" + "".join(rows) + "</div>"
 
 
-def generate_full_html(ea_first, ea_second, matured, ratio_best=0.9, ratio_second=0.85):
+def generate_full_html(ea_first, ea_second, matured, ratio=0.9):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
     css = (template_dir / "style.css").read_text(encoding="utf-8")
-    ref_ea = compute_average(ea_first, "ea")
     return (
         template.replace("{{CSS_STYLE}}", css)
         .replace(
-            "{{PITCH_EA_BEST}}",
-            render_pitch_card(ea_first, "ea", reference=ref_ea, ratio=ratio_best),
-        )
-        .replace(
-            "{{PITCH_EA_SECOND}}",
-            render_pitch_card(ea_second, "ea", reference=ref_ea, ratio=ratio_second),
+            "{{PITCH_22}}",
+            render_pitch_22_card(ea_first, ea_second, "ea", ratio),
         )
         .replace("{{LIST_MATURED}}", render_matured_list(matured))
         .replace("{{AVG_EA_BEST}}", str(compute_average(ea_first, "ea")))
@@ -398,8 +410,7 @@ def analyze(
     growth_until_age: int = 21,
     growth_per_year: int = 20,
     translate: bool = True,
-    ratio_best: float = 0.9,
-    ratio_second: float = 0.85,
+    ratio: float = 0.9,
 ) -> Optional[str]:
     """
     Core analysis flow: compute EA, then pick the two best non-overlapping
@@ -410,8 +421,8 @@ def analyze(
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     translate: translate selected player names to Chinese (default True).
-    ratio_best/second: weak-slot threshold as a fraction of the first XI's
-    average EA (defaults 0.9 / 0.85).
+    ratio: weak-slot threshold as a fraction of the first XI's average EA,
+    applied to both XIs (default 0.9).
     Returns the HTML string, or None if roster is empty.
     """
     candidates = [p for p in roster if p["age"] >= min_age]
@@ -421,17 +432,39 @@ def analyze(
 
     calculate_ea(candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
 
-    ea_first = select_best_xi(candidates, "ea")
-    used_ea = {id(p) for _, p in ea_first}
-    ea_second = select_best_xi([p for p in candidates if id(p) not in used_ea], "ea")
+    # 一次匈牙利算法选出 22 人（首发 11 + 替补 11），整体最优而非两次贪心
+    picks = select_best_xi(candidates, "ea", SLOTS_22)
+    ea_first = picks[:11]
+    ea_second = picks[11:]
+    # 同一位置多槽成本等价，求解器不区分首发/替补；按位置归位：
+    # 每个位置（SLOTS 里出现 k 次）取该位置全部 2k 人中 EA 前 k 名进首发。
+    # 不能逐槽对位比较——二队 DC2 可能比一队 DC1 更强。
+    by_pos: Dict[str, List[dict]] = {s: [] for s in SLOTS}
+    for (_slot, p) in ea_first:
+        by_pos[_slot].append(p)
+    for (_slot, p) in ea_second:
+        by_pos[_slot].append(p)
+    ea_first = []
+    ea_second = []
+    # 按去重位置遍历：每个位置（在 SLOTS 出现 k 次）有 2k 人，EA 前 k 进首发。
+    # 不能直接 for slot in SLOTS——DC/DMC 重复出现会整组重复入队。
+    for slot in dict.fromkeys(SLOTS):
+        k = SLOTS.count(slot)
+        group = sorted(by_pos[slot], key=lambda p: p["ea"], reverse=True)
+        ea_first.extend((slot, p) for p in group[:k])
+        ea_second.extend((slot, p) for p in group[k : k * 2])
 
-    # 剩余球员中已成熟（年龄 ≥ 成长截止年龄）的前 11 人，按 EA 降序
-    used_ea |= {id(p) for _, p in ea_second}
+    # 剩余球员（≥ 最小年龄）前 10 人，排除门将，按 CA 降序列榜
+    used_ea = {id(p) for _, p in picks}
     matured = sorted(
-        (p for p in candidates if id(p) not in used_ea and p["age"] >= growth_until_age),
-        key=lambda p: p["ea"],
+        (
+            p
+            for p in candidates
+            if id(p) not in used_ea and p["age"] >= min_age and not player_can_play(p["position"], "GK")
+        ),
+        key=lambda p: p["ca"],
         reverse=True,
-    )[:11]
+    )[:10]
 
     # 只翻译最终出现在网页（入选阵容）里的球员名字，避免多余请求
     _translate_xi_names(ea_first, ea_second, matured, translate=translate)
@@ -440,8 +473,7 @@ def analyze(
         ea_first,
         ea_second,
         matured,
-        ratio_best=ratio_best,
-        ratio_second=ratio_second,
+        ratio=ratio,
     )
     out = output or OUTPUT
     out.write_text(html, encoding="utf-8")

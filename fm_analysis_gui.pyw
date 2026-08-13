@@ -59,13 +59,9 @@ class FmGui:
 
         thr_row = ttk.Frame(frm)
         thr_row.grid(row=3, column=0, columnspan=3, sticky="ew", **pad)
-        self.ratio_best_var = tk.StringVar(value=str(self._config.get("ratio_best", 0.9)))
-        self.ratio_second_var = tk.StringVar(value=str(self._config.get("ratio_second", 0.85)))
+        self.ratio_var = tk.StringVar(value=str(self._config.get("ratio_best", 0.9)))
         ttk.Label(thr_row, text="阈值(相对最佳11人均EA):").pack(side="left")
-        ttk.Label(thr_row, text="最佳:").pack(side="left", padx=(6, 0))
-        ttk.Entry(thr_row, textvariable=self.ratio_best_var, width=5).pack(side="left")
-        ttk.Label(thr_row, text="次佳:").pack(side="left", padx=(6, 0))
-        ttk.Entry(thr_row, textvariable=self.ratio_second_var, width=5).pack(side="left")
+        ttk.Entry(thr_row, textvariable=self.ratio_var, width=5).pack(side="left", padx=(6, 0))
 
         club2_row = ttk.Frame(frm)
         club2_row.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
@@ -158,8 +154,7 @@ class FmGui:
             growth_per_year = int(self.ea_growth_var.get())
             if min_age <= 0 or growth_until_age <= 0 or growth_per_year < 0:
                 raise ValueError
-            ratio_best = self._parse_ratio(self.ratio_best_var.get())
-            ratio_second = self._parse_ratio(self.ratio_second_var.get())
+            ratio = self._parse_ratio(self.ratio_var.get())
         except ValueError:
             messagebox.showerror(
                 "错误", "参数必须是正整数（每年成长可为 0），阈值必须在 0~1 之间。"
@@ -187,8 +182,7 @@ class FmGui:
                 "translate_names": self.translate_var.get(),
                 "merge_club2": bool(self.compare_var.get()),
                 "club2_uid": club2_uid or 0,
-                "ratio_best": ratio_best,
-                "ratio_second": ratio_second,
+                "ratio_best": ratio,
             }
         )
         self.run_btn.configure(state="disabled")
@@ -201,8 +195,7 @@ class FmGui:
             f"参数: 最小 {min_age} 岁，EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
         )
         self.log_line(
-            "阈值(相对最佳均EA): "
-            f"最佳{ratio_best:.0%} / 次佳{ratio_second:.0%}"
+            f"阈值(相对最佳均EA): {ratio:.0%}"
         )
         self.log_line(f"翻译球员名字: {'开启' if self.translate_var.get() else '关闭'}")
         thread = threading.Thread(
@@ -214,8 +207,7 @@ class FmGui:
                 growth_until_age,
                 growth_per_year,
                 self.translate_var.get(),
-                ratio_best,
-                ratio_second,
+                ratio,
             ),
             daemon=True,
         )
@@ -229,8 +221,7 @@ class FmGui:
         growth_until_age,
         growth_per_year,
         translate,
-        ratio_best,
-        ratio_second,
+        ratio,
     ):
         try:
             name2 = None
@@ -260,8 +251,7 @@ class FmGui:
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
                 translate=translate,
-                ratio_best=ratio_best,
-                ratio_second=ratio_second,
+                ratio=ratio,
             )
             if html:
                 message = f"完成：{club_text}{detail}，结果已写入 {OUTPUT}"
