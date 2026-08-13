@@ -24,6 +24,7 @@ import glob
 import json
 import os
 import sys
+import tempfile
 from ctypes import wintypes as wt
 from pathlib import Path
 
@@ -396,17 +397,62 @@ def _club_name(mem, club_entry):
     return _read_len_str(mem, np)
 
 
-# ── 记录段（每次全量扫描，不做跨进程磁盘缓存）───────────────
-# 曾用磁盘缓存复用段列表（游戏未重启时地址稳定），但缓存校验只查前 5 段
-# 签名，游戏内重载存档/球员数组重建后，旧地址残留数据仍能通过签名校验，
-# 导致用过期段列表漏读球员（如整批一线队消失）。全量扫描实测约 3 秒，
-# 准确性优先，故每次重新扫描。
+# ── 记录段（磁盘缓存，按游戏日期失效）─────────────────────
+# 球员记录段列表在游戏运行期通常稳定；用游戏日期作失效判据：
+#   - pid 相同 且 游戏日期相同 → 段列表大概率未变，直接复用（免 3 秒全扫）
+#   - 否则全量重扫并更新缓存
+# 全量扫描实测约 3 秒，缓存命中则几乎瞬时。
+
+_REC_CACHE_PATH = Path(tempfile.gettempdir()) / "fm24_record_segments.json"
+
+
+def _cached_segments(mem, game_date):
+    """读磁盘缓存段列表；pid 或游戏日期不匹配（或读取失败）返回 None。"""
+    try:
+        if not _REC_CACHE_PATH.exists():
+            return None
+        data = json.loads(_REC_CACHE_PATH.read_text(encoding="utf-8"))
+        if data.get("pid") != mem.pid:
+            return None
+        if data.get("game_date") != str(game_date):
+            return None
+        segs = data.get("segments")
+        if not segs:
+            return None
+        # 校验前 5 段签名仍有效（地址残留校验的兜底）
+        for start, count in segs[:5]:
+            if mem.read_u32(start) != 0x45A4E958:
+                return None
+            if count > 1 and mem.read_u32(start + PLAYER_STRIDE) != 0x45A4E958:
+                return None
+        return [(s[0], s[1]) for s in segs]
+    except Exception:
+        return None
+
+
+def _save_segment_cache(mem, game_date, segs):
+    with contextlib.suppress(Exception):
+        _REC_CACHE_PATH.write_text(
+            json.dumps({"pid": mem.pid, "game_date": str(game_date), "segments": segs}),
+            encoding="utf-8",
+        )
 
 
 def scan_player_segments(mem):
-    """返回记录段列表 [(start, count), ...]，每次全量扫描。"""
+    """返回记录段列表 [(start, count), ...]。
+
+    游戏日期读取失败时无法判断是否过期，强制全量扫描（保守，避免漏读）。
+    """
+    game_date = read_game_date(mem)
+    if game_date is None:
+        return _record_segments(scan_player_records(mem))
+    cached = _cached_segments(mem, game_date)
+    if cached is not None:
+        return cached
     recs = scan_player_records(mem)
-    return _record_segments(recs)
+    segs = _record_segments(recs)
+    _save_segment_cache(mem, game_date, segs)
+    return segs
 
 
 def scan_player_records(mem):
