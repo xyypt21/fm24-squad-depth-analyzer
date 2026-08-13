@@ -31,7 +31,6 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 DEFAULT_CONFIG: Dict[str, Any] = {
     "club_uid": 920,
     "min_age": 17,
-    "ca_threshold": 100,
     "growth_until_age": 21,
     "growth_per_year": 20,
     "translate_names": False,
@@ -53,7 +52,6 @@ def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
     return {
         "club_uid": int(merged["club_uid"]),
         "min_age": int(merged["min_age"]),
-        "ca_threshold": int(merged["ca_threshold"]),
         "growth_until_age": int(merged["growth_until_age"]),
         "growth_per_year": int(merged["growth_per_year"]),
         "translate_names": bool(merged["translate_names"]),
@@ -450,11 +448,23 @@ def generate_full_html(ea_first, ea_second, ratio=0.9, ca_threshold=None):
 
 
 # ── Main flow ──────────────────────────────────────────────
+def compute_ca_threshold(candidates: List[dict]) -> int:
+    """门槛 = 除门将外按 CA 降序第 30 人的 CA；不足 30 人取最低者。
+
+    门将单独算（GK 是独立位置，不占外场名额），所以外场球员排到第 30 名
+    的 CA 作为"值得进入阵容深度分析"的下限。
+    """
+    field = [p for p in candidates if "GK" not in parse_position_tokens(p["position"])]
+    field.sort(key=lambda p: p["ca"], reverse=True)
+    if not field:
+        return 0
+    return field[min(29, len(field) - 1)]["ca"]
+
+
 def analyze(
     roster: List[dict],
     output: Optional[Path] = None,
     min_age: int = 17,
-    ca_threshold: int = 100,
     growth_until_age: int = 21,
     growth_per_year: int = 20,
     translate: bool = True,
@@ -466,7 +476,6 @@ def analyze(
     roster: list of player dicts, each with name/age/position/ca/pa.
     output: HTML output path, defaults to OUTPUT.
     min_age: only players aged >= min_age are considered (default 17).
-    ca_threshold: EA 候选门槛 = 手动输入的 CA 值，CA 低于门槛的球员不纳入 (default 100).
     growth_until_age: age at which EA growth stops (default 21).
     growth_per_year:  EA growth per year of age (default 20).
     translate: translate selected player names to Chinese (default True).
@@ -479,7 +488,8 @@ def analyze(
         print("未找到阵容数据")
         return None
 
-    # EA 图候选：CA 低于手动门槛的一律不纳入 EA 计算
+    # 门槛 = 除门将外按 CA 降序第 30 人的 CA，低于门槛的球员不纳入 EA 计算
+    ca_threshold = compute_ca_threshold(candidates)
     ea_candidates = [p for p in candidates if p["ca"] >= ca_threshold]
     calculate_ea(ea_candidates, growth_until_age=growth_until_age, growth_per_year=growth_per_year)
     ea_first, ea_second = select_squad(ea_candidates, "ea")

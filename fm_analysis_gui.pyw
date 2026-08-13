@@ -52,10 +52,7 @@ class FmGui:
 
         thr_row = ttk.Frame(frm)
         thr_row.grid(row=1, column=0, columnspan=3, sticky="ew", **pad)
-        self.ca_threshold_var = tk.StringVar(value=str(self._config.get("ca_threshold", 100)))
         self.ratio_var = tk.StringVar(value=str(self._config.get("ratio_best", 0.9)))
-        ttk.Label(thr_row, text="门槛CA值:").pack(side="left")
-        ttk.Entry(thr_row, textvariable=self.ca_threshold_var, width=5).pack(side="left", padx=(0, 10))
         ttk.Label(thr_row, text="弱项阈值(相对最佳均EA):").pack(side="left")
         ttk.Entry(thr_row, textvariable=self.ratio_var, width=5).pack(side="left", padx=(6, 0))
 
@@ -63,7 +60,7 @@ class FmGui:
         thr_hint.grid(row=2, column=0, columnspan=3, sticky="ew", **pad)
         ttk.Label(
             thr_hint,
-            text="门槛CA值：低于此CA的球员不纳入EA计算；"
+            text="门槛：自动取除门将外CA排名第30的球员的CA，低于门槛的球员不纳入EA计算；"
             "弱项阈值：EA低于最佳11人均EA×阈值的位置标红。",
             foreground="#555",
             justify="left",
@@ -157,10 +154,9 @@ class FmGui:
             club_uid = self._get_club_uid()
             if club_uid <= 0:
                 raise ValueError
-            ca_threshold = int(self.ca_threshold_var.get())
             growth_until_age = int(self.ea_age_var.get())
             growth_per_year = int(self.ea_growth_var.get())
-            if ca_threshold <= 0 or growth_until_age <= 0 or growth_per_year < 0:
+            if growth_until_age <= 0 or growth_per_year < 0:
                 raise ValueError
             ratio = self._parse_ratio(self.ratio_var.get())
         except ValueError:
@@ -184,7 +180,6 @@ class FmGui:
         save_config(
             {
                 "club_uid": club_uid,
-                "ca_threshold": ca_threshold,
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
                 "translate_names": self.translate_var.get(),
@@ -200,7 +195,7 @@ class FmGui:
             f"俱乐部 ID: {club_uid}" + (f"，合并第二俱乐部 {club2_uid}" if club2_uid else "")
         )
         self.log_line(
-            f"参数: EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}，门槛CA值 {ca_threshold}"
+            f"参数: EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
         )
         self.log_line(
             f"弱项阈值(相对最佳均EA): {ratio:.0%}"
@@ -211,7 +206,6 @@ class FmGui:
             args=(
                 club_uid,
                 club2_uid,
-                ca_threshold,
                 growth_until_age,
                 growth_per_year,
                 self.translate_var.get(),
@@ -225,7 +219,6 @@ class FmGui:
         self,
         club_uid,
         club2_uid,
-        ca_threshold,
         growth_until_age,
         growth_per_year,
         translate,
@@ -255,7 +248,6 @@ class FmGui:
             html = analyze(
                 roster,
                 output=OUTPUT,
-                ca_threshold=ca_threshold,
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
                 translate=translate,
