@@ -302,6 +302,8 @@ def select_best_xi(candidates: List[dict], sort_key: str, slots: List[str] = Non
       - Invalid assignment: far larger than any valid cost sum, so the
         algorithm prefers valid lineups.
     slots: slot names to fill (default SLOTS, 11 人；传 SLOTS_22 则一次选 22 人)。
+    无效分配（找不到能打该位置的球员）会被丢弃，对应槽位留空，绝不把
+    不能打该位置的球员硬塞进去。
     """
     slots = slots or SLOTS
     slot_count = len(slots)
@@ -317,7 +319,11 @@ def select_best_xi(candidates: List[dict], sort_key: str, slots: List[str] = Non
                 cost[slot_i, player_i] = max_key - player[sort_key]
 
     row_indices, col_indices = linear_sum_assignment(cost)
-    return [(slots[row], candidates[col]) for row, col in zip(row_indices, col_indices)]
+    result = []
+    for row, col in zip(row_indices, col_indices):
+        if cost[row, col] < huge_penalty:
+            result.append((slots[row], candidates[col]))
+    return result
 
 
 # ── HTML report rendering ─────────────────────────────────
@@ -402,29 +408,25 @@ def render_pitch_22_card(ea_first, ea_second, sort_key, ratio=0.9):
 
 
 def select_squad(candidates: List[dict], key: str):
-    """匈牙利一次选 22 人 + 按位置归位，返回 (首发 11, 替补 11)。
+    """匈牙利一次选 22 人 + 按位置归位，返回 (首发, 替补)。
 
     同一位置多槽成本等价，求解器不区分首发/替补；按位置归位：
-    每个位置（SLOTS 里出现 k 次）取该位置全部 2k 人中 key 前 k 名进首发。
-    注意不能逐槽对位比较——二队 DC2 可能比一队 DC1 更强。
+    每个位置（SLOTS 里出现 k 次）取其实际分配到槽位的球员，key 前 k 名进首发、
+    其余进替补；某位置没有合适球员时该位置槽位留空（不出现在返回里）。
     """
     picks = select_best_xi(candidates, key, SLOTS_22)
-    ea_first = picks[:11]
-    ea_second = picks[11:]
-    by_pos: Dict[str, List[dict]] = {s: [] for s in SLOTS}
-    for (_slot, p) in ea_first:
-        by_pos[_slot].append(p)
-    for (_slot, p) in ea_second:
-        by_pos[_slot].append(p)
+    by_pos: Dict[str, List[tuple]] = {}
+    for slot_name, p in picks:
+        by_pos.setdefault(slot_name, []).append((slot_name, p))
     ea_first = []
     ea_second = []
-    # 按去重位置遍历：每个位置（在 SLOTS 出现 k 次）有 2k 人，key 前 k 进首发。
+    # 按去重位置遍历：每个位置（在 SLOTS 出现 k 次）最多 2k 个槽位。
     # 不能直接 for slot in SLOTS——DC/DMC 重复出现会整组重复入队。
     for slot in dict.fromkeys(SLOTS):
         k = SLOTS.count(slot)
-        group = sorted(by_pos[slot], key=lambda p: p[key], reverse=True)
-        ea_first.extend((slot, p) for p in group[:k])
-        ea_second.extend((slot, p) for p in group[k : k * 2])
+        group = sorted(by_pos.get(slot, []), key=lambda t: t[1][key], reverse=True)
+        ea_first.extend(group[:k])
+        ea_second.extend(group[k : k * 2])
     return ea_first, ea_second
 
 
