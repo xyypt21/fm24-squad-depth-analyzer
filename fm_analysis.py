@@ -19,6 +19,7 @@ import os
 import re
 import socket
 import ssl
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -140,8 +141,8 @@ PROXY_URL = os.environ.get("FM_PROXY", "http://127.0.0.1:7897")
 
 # 单次请求超时（代理不通会无限阻塞）
 _REQUEST_TIMEOUT = 10
-# 单批翻译失败重试次数（代理/网关偶发 SSL 断连，重试通常即成功）
-_RETRIES = 3
+# 单批翻译失败重试次数（代理/网关偶发 SSL 断连、Google 短时限流，重试通常即成功）
+_RETRIES = 5
 
 
 def _proxies():
@@ -222,10 +223,12 @@ def _batch_translate(names):
 
     proxies = _proxies()
     translated = {}
-    for _ in range(_RETRIES):
+    for attempt in range(_RETRIES):
         translated = _translate_batch(todo, proxies)
         if translated:
             break
+        if attempt + 1 < _RETRIES:
+            time.sleep(1.0 * (attempt + 1))
 
     for name, cn in translated.items():
         _cache[name] = cn
@@ -588,6 +591,10 @@ def analyze(
     ea_first, ea_second = select_squad(candidates, "ea")
     chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
 
+    # 所有达龄球员的英文名一起翻译（覆盖主力/替补表/可卖榜/未上榜全部），
+    # 只发一次批量请求；未命中的保持原样。须在渲染前执行，渲染结果才用中文名。
+    _translate_xi_names(candidates, translate=translate)
+
     # 替补表：位置池（每位置 EA 前 N 人）里的非主力（未入选 22 人）
     pool = compute_position_pool(candidates)
     depth_html = render_depth_table(pool, chosen_ids)
@@ -598,14 +605,6 @@ def analyze(
     sell_candidates.sort(key=lambda p: p["age"], reverse=True)
     sell_top = sell_candidates[:11]
     sell_html = render_sell_table(sell_top)
-
-    # 只翻译最终出现在网页（入选阵容 + 替补表 + 可卖榜）里的球员名字
-    _translate_xi_names(
-        ea_first, ea_second,
-        [p for players in pool.values() for p in players],
-        sell_top,
-        translate=translate,
-    )
 
     html = generate_full_html(
         ea_first,
