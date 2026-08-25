@@ -3,3 +3,4 @@ __pycache__/
 *.html
 !templates/*.html
 config.json
+translation_cache.json

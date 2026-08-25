@@ -17,9 +17,9 @@ EA (Expected Ability) = CA + growth potential
 import json
 import os
 import re
-import socket
 import ssl
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -131,18 +131,33 @@ def player_can_play(position_text: str, slot_name: str) -> bool:
 
 
 # ── Online name translation (Google via local proxy) ─────
-# 进程内在线翻译缓存与失败黑名单（避免重复请求）
-_cache: dict = {}
-_failed: set = set()
-
+# 每次都联网实时翻译，不使用任何缓存（不读盘、不写盘）。
 # 本地代理（Clash 等默认端口 7897），走境外 Google 翻译必需。
 # 可通过环境变量 FM_PROXY 覆盖，空字符串/None 表示不走代理。
 PROXY_URL = os.environ.get("FM_PROXY", "http://127.0.0.1:7897")
 
 # 单次请求超时（代理不通会无限阻塞）
 _REQUEST_TIMEOUT = 10
-# 单批翻译失败重试次数（代理/网关偶发 SSL 断连、Google 短时限流，重试通常即成功）
-_RETRIES = 5
+# 翻译端点回退链：主端点（translate_a/single gtx）被 IP 限流时换备用端点
+# （clients5 translate_a/t dict-chrome-ex，限流池独立），两者都挂才退避重试。
+_TRANSLATE_URLS = (
+    "https://translate.googleapis.com/translate_a/single"
+    "?client=gtx&sl=en&tl=zh-CN&dt=t&q=",
+    "https://clients5.google.com/translate_a/t"
+    "?client=dict-chrome-ex&sl=en&tl=zh-CN&q=",
+)
+# 端点全被限流时的重试次数与指数退避基数（5/10 秒），
+# 并尊重 Retry-After 头；限流窗口常达几十秒，短退避必然全灭。
+_RETRIES = 2
+_BACKOFF_BASE = 5.0
+
+
+class _RateLimited(Exception):
+    """翻译端点返回 429 时抛出，携带建议等待秒数（Retry-After，可能为 0）。"""
+
+    def __init__(self, retry_after: float):
+        super().__init__(f"HTTP 429, retry after {retry_after}s")
+        self.retry_after = retry_after
 
 
 def _proxies():
@@ -151,89 +166,136 @@ def _proxies():
     return {"http": PROXY_URL, "https": PROXY_URL}
 
 
+def _fetch_translate(url: str, proxies):
+    """请求一个翻译端点，返回解析后的 JSON。
+
+    429 抛 _RateLimited（带 Retry-After）；其余异常原样抛出由调用方处理。
+    """
+    proxy_handler = urllib.request.ProxyHandler(proxies or {})
+    # 公开端点无证书链校验，避免个别代理/网关打断 TLS
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    opener = urllib.request.build_opener(
+        proxy_handler, urllib.request.HTTPSHandler(context=ctx)
+    )
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "Mozilla/5.0", "Accept-Encoding": "identity"}
+    )
+    try:
+        with opener.open(req, timeout=_REQUEST_TIMEOUT) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429:
+            # Retry-After 可能是秒数或 HTTP 日期，解析失败按 0 处理
+            try:
+                retry_after = float(exc.headers.get("Retry-After") or 0)
+            except ValueError:
+                retry_after = 0.0
+            raise _RateLimited(retry_after) from exc
+        raise
+
+
+def _extract_lines(data) -> List[str]:
+    """把端点响应统一拆成逐行译文。
+
+    single 端点 (gtx): data[0] 是分段列表，每段 [dst, src, ...]，dst 即该行译文
+        （自带换行分隔），把所有段的 dst 拼接后 splitlines 即得逐行译文；用顺序
+        与输入名字对齐。
+    t 端点 (clients5): data[0] 是字符串（可含换行）或字符串列表。
+    """
+    first = data[0]
+    if isinstance(first, str):
+        return first.splitlines()
+    if isinstance(first, list) and first and isinstance(first[0], list):
+        text = "".join(seg[0] for seg in first if seg and isinstance(seg[0], str))
+        return text.splitlines()
+    parts = []
+    for item in first or []:
+        if isinstance(item, str):
+            parts.append(item)
+        elif item and item[0]:
+            parts.append(item[0])
+    return "\n".join(parts).splitlines()
+
+
+def _fetch_any(text: str, proxies):
+    """沿端点回退链请求翻译，返回解析后的 JSON。
+
+    主端点被限流/断连时自动换下一个（限流池独立，往往能成功）。
+    全部端点都限流时抛最先的 _RateLimited；全部网络故障时返回 None。
+    """
+    rate_exc = None
+    for base_url in _TRANSLATE_URLS:
+        try:
+            return _fetch_translate(base_url + quote(text), proxies)
+        except _RateLimited as exc:
+            rate_exc = rate_exc or exc
+        except Exception:
+            pass  # 断连/超时等瞬时故障：试下一个端点
+    if rate_exc is not None:
+        raise rate_exc
+    return None
+
+
 def _translate_batch(names, proxies):
     """把整批名字每行一个 "player:xxx" 拼成一段一次翻译，再按行拆回。
 
-    走 Google gtx 公开端点，逐段拆回 originalText 与译文对齐。
     逐行 "player:" 前缀让 Google 把每行当球员名处理，能正确识别名/姓、保留
-    间隔号（·）。保持原始大小写。返回 {原名: 中文}；译文与原名相同或异常时
-    不返回该名字。
+    间隔号（·）。保持原始大小写。返回 {原名: 中文}；
+    译文为空或与原文相同（如已是中文名）的名字不返回（保留英文名）。
+    全部端点都限流时抛 _RateLimited 交给上层退避；全部网络故障或响应异常时
+    静默返回 {}，不阻塞分析。
     """
     if not names:
         return {}
-    text = "\n".join("player:" + n for n in names)
-    try:
-        url = (
-            "https://translate.googleapis.com/translate_a/single"
-            "?client=gtx&sl=en&tl=zh-CN&dt=t&q="
-            + quote(text)
-        )
-        proxy_handler = urllib.request.ProxyHandler(proxies or {})
-        # gtx 是公开端点，无证书链校验，避免个别代理/网关打断 TLS
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        https_handler = urllib.request.HTTPSHandler(context=ctx)
-        opener = urllib.request.build_opener(proxy_handler, https_handler)
-        req = urllib.request.Request(
-            url, headers={"User-Agent": "Mozilla/5.0", "Accept-Encoding": "identity"}
-        )
-        with opener.open(req, timeout=_REQUEST_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        # 网络/代理/SSL 异常一律静默：翻译失败时保留英文原名，不阻塞分析
-        return {}
+    data = _fetch_any("\n".join("player:" + n for n in names), proxies)
     if not data or not data[0]:
         return {}
     # 每行译文都带 "球员：/玩家：" 前缀，剥掉后与原名逐行对应
-    lines = []
-    for seg in data[0]:
-        if not seg or not seg[0]:
-            continue
-        line = seg[0].strip()
+    result = {}
+    for name, raw in zip(names, _extract_lines(data)):
+        line = raw.strip()
         for sep in ("：", ":"):
             if sep in line:
                 line = line.split(sep, 1)[1].strip()
                 break
-        if line:
-            lines.append(line)
-    result = {}
-    for name, line in zip(names, lines):
+        # 仅缓存真正译出的名字；译文为空或与原文相同不写入缓存
         if line and line != name:
             result[name] = line
     return result
 
 
-def _batch_translate(names):
-    """批量翻译一批名字：一次请求整批走 Google 翻译（经本地代理）。
-
-    保持原始大小写（小写会丢失名/姓间的间隔号 ·），
-    返回 {原名: 中文}；翻译异常/未命中的名字不返回（由调用方原样保留）。
-    只走内存缓存，不写文件。
-    """
-    todo = []
-    result = {}
-    for n in names:
-        if n in _cache:
-            result[n] = _cache[n]
-        elif n not in _failed:
-            todo.append(n)
-    if not todo:
-        return result
-
-    proxies = _proxies()
+def _translate_with_retry(names, proxies):
+    """带退避的整批翻译：限流按 Retry-After/指数退避，普通失败线性退避。"""
     translated = {}
+    wait = 0.0
     for attempt in range(_RETRIES):
-        translated = _translate_batch(todo, proxies)
+        try:
+            translated = _translate_batch(names, proxies)
+            # 普通失败（断连/空响应）：沿用线性退避
+            wait = 1.0 * (attempt + 1)
+        except _RateLimited as exc:
+            # 限流：取 Retry-After 与指数退避的较大者
+            wait = max(exc.retry_after, _BACKOFF_BASE * (2**attempt))
+            translated = {}
         if translated:
             break
         if attempt + 1 < _RETRIES:
-            time.sleep(1.0 * (attempt + 1))
+            time.sleep(wait)
+    return translated
 
-    for name, cn in translated.items():
-        _cache[name] = cn
-        result[name] = cn
-    return result
+
+def _batch_translate(names):
+    """批量翻译一批名字：一次请求整批走 Google 翻译（经本地代理）。
+
+    不使用任何缓存，每次都实时联网翻译。保持原始大小写（小写会丢失
+    名/姓间的间隔号 ·），返回 {原名: 中文}；翻译异常/未命中的名字
+    不返回（由调用方原样保留英文名）。
+    """
+    if not names:
+        return {}
+    return _translate_with_retry(names, _proxies())
 
 
 def auto_translate(names):
@@ -471,10 +533,13 @@ def compute_position_pool(candidates: List[dict]) -> Dict[str, List[dict]]:
     return pool
 
 
-def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
+def render_depth_table(
+    pool: Dict[str, List[dict]], chosen_ids: set, reference: float = 0, ratio: float = 0.9
+) -> str:
     """渲染替补表：每个位置只列出池子中的替补（未入选 22 人的球员）。
 
     chosen_ids: 匈牙利算法选出的 22 人 id 集合。
+    弱项标红与最佳 22 人同逻辑：EA < reference * ratio 的球员名标红。
     """
     if not pool:
         return "<div class='remaining'>无数据</div>"
@@ -487,7 +552,12 @@ def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
         gap = max(0, position_pool_size(slot) - len(players))
         status_cls = "d-ok" if not gap else "d-short"
         names = "、".join(
-            f"{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})" for p in bench
+            (
+                f"<span class='weak-name'>{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})</span>"
+                if is_weak(p["ea"], reference, ratio)
+                else f"{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})"
+            )
+            for p in bench
         ) or "无"
         rows.append(
             f"<div class='d-row {status_cls}'>"
@@ -502,16 +572,20 @@ def render_depth_table(pool: Dict[str, List[dict]], chosen_ids: set) -> str:
     return "<div class='remaining'>" + "".join(rows) + "</div>"
 
 
-def render_sell_table(players: List[dict]) -> str:
-    """渲染可卖榜：既不在 22 人主力、也不在替补表的人，按年龄降序取前 11。"""
+def render_sell_table(players: List[dict], reference: float = 0, ratio: float = 0.9) -> str:
+    """渲染可卖榜：既不在 22 人主力、也不在替补表的人，按年龄降序取前 11。
+
+    弱项标红与最佳 22 人同逻辑：EA < reference * ratio 的整行标红。
+    """
     if not players:
         return "<div class='remaining'>无可卖球员</div>"
     rows = []
     for rank, p in enumerate(players, 1):
+        weak = " weak-name" if is_weak(p["ea"], reference, ratio) else ""
         rows.append(
             f"<div class='s-row'>"
             f"<span class='s-rank'>{rank}</span>"
-            f"<span class='s-name'>{p['name']}</span>"
+            f"<span class='s-name{weak}'>{p['name']}</span>"
             f"<span class='s-pos'>{p['position']}</span>"
             f"<span class='s-age'>{p['age']:.0f}岁</span>"
             f"<span class='s-stat'>CA{p['ca']}</span>"
@@ -590,6 +664,8 @@ def analyze(
     # 匈牙利算法从全部达龄球员里选 22 人（首发 + 替补）
     ea_first, ea_second = select_squad(candidates, "ea")
     chosen_ids = {id(p) for _s, p in ea_first} | {id(p) for _s, p in ea_second}
+    # 弱项标红基准：首发 11 人平均 EA，替补表/可卖榜与最佳 22 人共用
+    reference = compute_average(ea_first, "ea")
 
     # 所有达龄球员的英文名一起翻译（覆盖主力/替补表/可卖榜/未上榜全部），
     # 只发一次批量请求；未命中的保持原样。须在渲染前执行，渲染结果才用中文名。
@@ -597,14 +673,14 @@ def analyze(
 
     # 替补表：位置池（每位置 EA 前 N 人）里的非主力（未入选 22 人）
     pool = compute_position_pool(candidates)
-    depth_html = render_depth_table(pool, chosen_ids)
+    depth_html = render_depth_table(pool, chosen_ids, reference=reference, ratio=ratio)
 
     # 可卖榜：既不在 22 人主力、也不在替补表（任何位置池）的人，按年龄降序前 11
     pool_ids = {id(p) for players in pool.values() for p in players}
     sell_candidates = [p for p in candidates if id(p) not in chosen_ids and id(p) not in pool_ids]
     sell_candidates.sort(key=lambda p: p["age"], reverse=True)
     sell_top = sell_candidates[:11]
-    sell_html = render_sell_table(sell_top)
+    sell_html = render_sell_table(sell_top, reference=reference, ratio=ratio)
 
     html = generate_full_html(
         ea_first,

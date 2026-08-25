@@ -48,3 +48,5 @@ html,body { height:100%; font-family:"Microsoft YaHei","Segoe UI",sans-serif; ba
 .s-age { color:#666; font-size:11px; width:36px; text-align:right; }
 .s-stat { font-weight:bold; color:#c0392b; width:44px; text-align:right; }
 .s-ea { font-weight:bold; color:#16a085; width:50px; text-align:right; }
+/* 弱项标红（替补表/可卖榜，与最佳 22 人同逻辑） */
+.weak-name { color:#c0392b; font-weight:bold; }

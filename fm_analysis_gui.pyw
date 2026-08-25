@@ -74,7 +74,10 @@ class FmGui:
         ttk.Label(ea_row, text="EA成长至年龄:").pack(side="left")
         ttk.Entry(ea_row, textvariable=self.ea_age_var, width=6).pack(side="left", padx=(0, 10))
         ttk.Label(ea_row, text="EA每年成长:").pack(side="left")
-        ttk.Entry(ea_row, textvariable=self.ea_growth_var, width=6).pack(side="left")
+        ttk.Entry(ea_row, textvariable=self.ea_growth_var, width=6).pack(side="left", padx=(0, 10))
+        self.min_age_var = tk.StringVar(value=str(self._config["min_age"]))
+        ttk.Label(ea_row, text="入选最低年龄:").pack(side="left")
+        ttk.Entry(ea_row, textvariable=self.min_age_var, width=6).pack(side="left")
 
         opt_row = ttk.Frame(frm)
         opt_row.grid(row=4, column=0, columnspan=3, sticky="ew", **pad)
@@ -158,6 +161,9 @@ class FmGui:
             growth_per_year = int(self.ea_growth_var.get())
             if growth_until_age <= 0 or growth_per_year < 0:
                 raise ValueError
+            min_age = int(self.min_age_var.get())
+            if min_age <= 0:
+                raise ValueError
             ratio = self._parse_ratio(self.ratio_var.get())
         except ValueError:
             messagebox.showerror(
@@ -180,6 +186,7 @@ class FmGui:
         save_config(
             {
                 "club_uid": club_uid,
+                "min_age": min_age,
                 "growth_until_age": growth_until_age,
                 "growth_per_year": growth_per_year,
                 "translate_names": self.translate_var.get(),
@@ -195,7 +202,7 @@ class FmGui:
             f"俱乐部 ID: {club_uid}" + (f"，合并第二俱乐部 {club2_uid}" if club2_uid else "")
         )
         self.log_line(
-            f"参数: EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}"
+            f"参数: EA成长至 {growth_until_age} 岁，每年 +{growth_per_year}，入选最低 {min_age} 岁"
         )
         self.log_line(
             f"弱项阈值(相对最佳均EA): {ratio:.0%}"
@@ -206,6 +213,7 @@ class FmGui:
             args=(
                 club_uid,
                 club2_uid,
+                min_age,
                 growth_until_age,
                 growth_per_year,
                 self.translate_var.get(),
@@ -219,6 +227,7 @@ class FmGui:
         self,
         club_uid,
         club2_uid,
+        min_age,
         growth_until_age,
         growth_per_year,
         translate,
@@ -248,6 +257,7 @@ class FmGui:
             html = analyze(
                 roster,
                 output=OUTPUT,
+                min_age=min_age,
                 growth_until_age=growth_until_age,
                 growth_per_year=growth_per_year,
                 translate=translate,
