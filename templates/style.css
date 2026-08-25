@@ -50,3 +50,5 @@ html,body { height:100%; font-family:"Microsoft YaHei","Segoe UI",sans-serif; ba
 .s-ea { font-weight:bold; color:#16a085; width:50px; text-align:right; }
 /* 弱项标红（替补表/可卖榜，与最佳 22 人同逻辑） */
 .weak-name { color:#c0392b; font-weight:bold; }
+/* 位置红框：该位置在 22 人名单或替补表任一处标红时，框住整个位置叠卡 */
+.pos-weak { outline:2px solid rgba(231,76,60,0.85); outline-offset:2px; border-radius:6px; }

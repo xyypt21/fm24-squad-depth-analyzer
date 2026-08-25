@@ -146,10 +146,10 @@ _TRANSLATE_URLS = (
     "https://clients5.google.com/translate_a/t"
     "?client=dict-chrome-ex&sl=en&tl=zh-CN&q=",
 )
-# 端点全被限流时的重试次数与指数退避基数（5/10 秒），
-# 并尊重 Retry-After 头；限流窗口常达几十秒，短退避必然全灭。
+# 端点全被限流时的重试次数与指数退避基数（1/2 秒），
+# 并尊重 Retry-After 头。
 _RETRIES = 2
-_BACKOFF_BASE = 5.0
+_BACKOFF_BASE = 1.0
 
 
 class _RateLimited(Exception):
@@ -412,13 +412,15 @@ def render_player_slot(slot_name, player, sort_key, reference_value, ratio, sub=
     )
 
 
-def render_pitch_22(ea_first, ea_second, sort_key, reference, ratio=0.9):
+def render_pitch_22(ea_first, ea_second, sort_key, reference, ratio=0.9, extra_weak=None):
     """Render a single 22-man pitch: each position shows first XI + second XI.
 
     同一位置的首发/替补叠在一个 slot 内（首发实线、替补虚线），
     弱项高亮：首发/替补统一按 ratio，均以首发均 EA 为基准。
     ea_first/ea_second 是按位置归位的 (slot, player) 列表，按 SLOTS 顺序排列，
     每位置取序列里第 occ 人；某位置替补不足时该槽不渲染替补。
+    extra_weak: 额外的弱项位置集合（如来自替补表的红名）。位置只要在
+    22 人名单或替补表任一处标红，整个位置叠卡外框加红框（pos-weak）。
     """
     # 按位置分组（保持 SLOTS 内的出现顺序）
     first_by_slot: Dict[str, List[dict]] = {}
@@ -444,7 +446,13 @@ def render_pitch_22(ea_first, ea_second, sort_key, reference, ratio=0.9):
             parts.append(render_player_slot(slot_name, player, sort_key, reference, ratio))
         if sub_player is not None:
             parts.append(render_player_slot(slot_name, sub_player, sort_key, reference, ratio, sub=True))
-        return f"<div class='slot-stack'>" + "".join(parts) + "</div>"
+        # 该位置任一来源标红（名单内球员 EA 弱 / 替补表红名）→ 整个位置加框
+        pos_weak = (
+            slot_name in (extra_weak or ())
+            or any(is_weak(p[sort_key], reference, ratio) for p in firsts + seconds)
+        )
+        stack_cls = "slot-stack pos-weak" if pos_weak else "slot-stack"
+        return f"<div class='{stack_cls}'>" + "".join(parts) + "</div>"
 
     row_indices = [(10,), (7, 8, 9), (5, 6), (1, 2, 3, 4), (0,)]
     rows = [
@@ -454,8 +462,8 @@ def render_pitch_22(ea_first, ea_second, sort_key, reference, ratio=0.9):
     return "\n".join(rows)
 
 
-def render_pitch_22_card(ea_first, ea_second, sort_key, ratio=0.9):
-    """Render a single 22-man pitch card."""
+def render_pitch_22_card(ea_first, ea_second, sort_key, ratio=0.9, extra_weak=None):
+    """Render a single 22-man pitch card. extra_weak: 替补表标红的位置集合。"""
     if not ea_first:
         return (
             "<div class='pitch' style='display:flex;align-items:center;"
@@ -465,7 +473,7 @@ def render_pitch_22_card(ea_first, ea_second, sort_key, ratio=0.9):
     reference = compute_average(ea_first, sort_key)
     return (
         f"<div class='pitch'>"
-        f"{render_pitch_22(ea_first, ea_second, sort_key, reference, ratio)}"
+        f"{render_pitch_22(ea_first, ea_second, sort_key, reference, ratio, extra_weak)}"
         f"</div>"
     )
 
@@ -601,6 +609,7 @@ def generate_full_html(
     depth_html=None,
     sell_html=None,
     ratio=0.9,
+    extra_weak=None,
 ):
     template_dir = Path(__file__).parent / "templates"
     template = (template_dir / "report.html").read_text(encoding="utf-8")
@@ -609,7 +618,7 @@ def generate_full_html(
         template.replace("{{CSS_STYLE}}", css)
         .replace(
             "{{PITCH_22}}",
-            render_pitch_22_card(ea_first, ea_second, "ea", ratio),
+            render_pitch_22_card(ea_first, ea_second, "ea", ratio, extra_weak),
         )
         .replace(
             "{{DEPTH}}",
@@ -674,6 +683,15 @@ def analyze(
     # 替补表：位置池（每位置 EA 前 N 人）里的非主力（未入选 22 人）
     pool = compute_position_pool(candidates)
     depth_html = render_depth_table(pool, chosen_ids, reference=reference, ratio=ratio)
+    # 替补表中带红名（EA 弱）的位置集合，用于球场上给该位置加红框
+    bench_weak = {
+        slot
+        for slot, players in pool.items()
+        if any(
+            id(p) not in chosen_ids and is_weak(p["ea"], reference, ratio)
+            for p in players
+        )
+    }
 
     # 可卖榜：既不在 22 人主力、也不在替补表（任何位置池）的人，按年龄降序前 11
     pool_ids = {id(p) for players in pool.values() for p in players}
@@ -688,6 +706,7 @@ def analyze(
         depth_html=depth_html,
         sell_html=sell_html,
         ratio=ratio,
+        extra_weak=bench_weak,
     )
     out = output or OUTPUT
     out.write_text(html, encoding="utf-8")
