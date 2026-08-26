@@ -23,15 +23,16 @@ python fm_probe_user.py --club 920
 ## Layout
 
 ```
-fm_club_gui.pyw       GUI entry
-fmlib/memory.py       read-only cross-process memory primitives (ctypes)
-fmlib/offsets.py      fm_offsets_info.json loader, version selection
-fmlib/session.py      game session: attach, exe version, in-game date
-fmlib/clubs.py        CLUB record readers (uid, name)
-fmlib/user_club.py    detection: human-manager vector ∩ team manager pointers
-fm_probe_user.py      diagnostic script
-fm_offsets_info.json  offset reference table (FM Scouting Tool data)
-config.json           persisted settings (club_uid, ...)
+fm_club_gui.pyw           GUI entry (adds src/ to sys.path)
+src/memory.py             read-only cross-process memory primitives (ctypes)
+src/offsets.py            fm_offsets_info.json loader, version selection
+src/session.py            game session: attach, exe version, in-game date
+src/clubs.py              CLUB record readers (uid, name)
+src/user_club.py          detection: human-manager vector ∩ team manager pointers
+tools/fm_probe_user.py    diagnostic script
+tests/test_basics.py      unit tests (no game required)
+fm_offsets_info.json      offset reference table (FM Scouting Tool data)
+config.json               persisted settings (club_uid, ...)
 ```
 
 Detection principle: `[exe+mgr_hnp_rva]` → vector of the user-controlled

@@ -7,8 +7,8 @@ uid 与名字缓冲指针。
 
 from typing import Optional
 
-from fmlib.memory import FmMemory
-from fmlib.offsets import Offsets
+from memory import FmMemory
+from offsets import Offsets
 
 MAX_UID = 1 << 31
 

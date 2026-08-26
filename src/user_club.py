@@ -16,15 +16,15 @@
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, List, Optional, Set
 
-from fmlib.clubs import (
+from clubs import (
     read_club_name,
     read_club_uid,
     type_id_ok,
     uid_sane,
 )
-from fmlib.memory import FmMemory
-from fmlib.offsets import Offsets
-from fmlib.session import GameSession
+from memory import FmMemory
+from offsets import Offsets
+from session import GameSession
 
 # 球员记录（entity_ap）特征签名与布局，与 fm24_probe.py 同源（实测验证）
 PLAYER_SIGNATURE = b"\x58\xe9\xa4\x45"  # 记录头 u32 = 0x45A4E958

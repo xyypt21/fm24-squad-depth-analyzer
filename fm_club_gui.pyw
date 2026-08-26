@@ -11,13 +11,16 @@
 
 import json
 import queue
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
 
-from fmlib.session import attach_session
-from fmlib.user_club import DetectionError, detect_user_clubs
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+from session import attach_session  # noqa: E402
+from user_club import DetectionError, detect_user_clubs  # noqa: E402
 
 CONFIG_PATH = Path(__file__).parent / "config.json"
 POLL_MS = 150

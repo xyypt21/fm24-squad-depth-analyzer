@@ -16,21 +16,28 @@ pythonw fm_club_gui.pyw
 检测失败或游戏更新后偏移失效时，运行诊断：
 
 ```bash
-python fm_probe_user.py --club 920
+python tools/fm_probe_user.py --club 920
+```
+
+单元测试（无需游戏）：
+
+```bash
+python tests/test_basics.py
 ```
 
 ## 结构
 
 ```
-fm_club_gui.pyw       GUI 入口
-fmlib/memory.py       只读跨进程内存原语（ctypes）
-fmlib/offsets.py      fm_offsets_info.json 加载与版本选择
-fmlib/session.py      游戏会话：附加进程、exe 版本、游戏内日期
-fmlib/clubs.py        俱乐部记录读取（uid、队名）
-fmlib/user_club.py    检测：人控经理向量 ∩ 球队教练指针
-fm_probe_user.py      诊断脚本
-fm_offsets_info.json  偏移参考表（FM Scouting Tool 数据）
-config.json           配置持久化（club_uid 等）
+fm_club_gui.pyw        GUI 入口（自动把 src/ 加入 sys.path）
+src/memory.py          只读跨进程内存原语（ctypes）
+src/offsets.py         fm_offsets_info.json 加载与版本选择
+src/session.py         游戏会话：附加进程、exe 版本、游戏内日期
+src/clubs.py           俱乐部记录读取（uid、队名）
+src/user_club.py       检测：人控经理向量 ∩ 球队教练指针
+tools/fm_probe_user.py 诊断脚本
+tests/test_basics.py   单元测试（无需游戏）
+fm_offsets_info.json   偏移参考表（FM Scouting Tool 数据）
+config.json            配置持久化（club_uid 等）
 ```
 
 检测原理：`[exe+mgr_hnp_rva]` → 人控经理对象向量；球员记录签名扫描枚举全部球队；

@@ -13,11 +13,14 @@
 import argparse
 import contextlib
 import sys
+from pathlib import Path
 
-from fmlib.clubs import read_club_name, read_club_uid, type_id_ok
-from fmlib.offsets import _int
-from fmlib.session import GameSession
-from fmlib.user_club import (
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from clubs import read_club_name, read_club_uid, type_id_ok  # noqa: E402
+from offsets import _int  # noqa: E402
+from session import GameSession  # noqa: E402
+from user_club import (  # noqa: E402
     MANAGER_BLOCK,
     _manager_block_hit,
     _match_clubs,
@@ -35,10 +38,11 @@ MIN_PTR = 0x10000
 
 def load_config():
     import json
-    from pathlib import Path
 
     try:
-        return json.loads((Path(__file__).parent / "config.json").read_text(encoding="utf-8"))
+        return json.loads(
+            (Path(__file__).resolve().parent.parent / "config.json").read_text(encoding="utf-8")
+        )
     except Exception:
         return {}
 

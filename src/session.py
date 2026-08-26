@@ -5,8 +5,8 @@ import datetime
 import re
 from typing import Optional
 
-from fmlib.memory import FmMemory
-from fmlib.offsets import Offsets, load_offsets
+from memory import FmMemory
+from offsets import Offsets, load_offsets
 
 PROC_PATTERN = r"^(fm|footballmanager)\.exe$"
 
