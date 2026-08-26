@@ -1,41 +1,46 @@
-# FM24 Club ID Detector (tmp branch)
+# FM24 俱乐部 ID 检测器（tmp 分支）
 
-Reads the running FM24 process memory (read-only) and auto-detects the club
-managed by the human player, showing its UID and name in a small GUI.
+只读访问运行中的 FM24 进程内存，自动检测玩家（人控经理）执教的俱乐部，在 GUI 中显示其 ID 与队名。
 
-## Usage
+## 使用
 
 ```bash
 pythonw fm_club_gui.pyw
 ```
 
-1. Start FM24 and load a save.
-2. Click "连接游戏并检测" (Connect & detect).
-3. Pick a candidate club if several are listed; the UID fills into the box.
-4. "保存为默认俱乐部 ID" writes it back to `config.json`.
+1. 启动 FM24 并载入存档。
+2. 点击"连接游戏并检测"。
+3. 若有多家候选（网络球等），下拉选择；ID 会填入输入框。
+4. "保存为默认俱乐部 ID"写回 `config.json`。
 
-Diagnostics (if detection fails or after a game update):
+检测失败或游戏更新后偏移失效时，运行诊断：
 
 ```bash
-python fm_probe_user.py --club 920
+python tools/fm_probe_user.py --club 920
 ```
 
-## Layout
+单元测试（无需游戏）：
 
-```
-fm_club_gui.pyw           GUI entry (adds src/ to sys.path)
-src/memory.py             read-only cross-process memory primitives (ctypes)
-src/offsets.py            fm_offsets_info.json loader, version selection
-src/session.py            game session: attach, exe version, in-game date
-src/clubs.py              CLUB record readers (uid, name)
-src/user_club.py          detection: human-manager vector ∩ team manager pointers
-tools/fm_probe_user.py    diagnostic script
-tests/test_basics.py      unit tests (no game required)
-fm_offsets_info.json      offset reference table (FM Scouting Tool data)
-config.json               persisted settings (club_uid, ...)
+```bash
+python tests/test_basics.py
 ```
 
-Detection principle: `[exe+mgr_hnp_rva]` → vector of the user-controlled
-manager objects; player-record signature scan enumerates all teams; each team's
-`manager_ptr` (+0x80) that equals (or references) a vector entry marks the
-user's team → parent club UID + name.
+## 结构
+
+```
+fm_club_gui.pyw        GUI 入口（自动把 src/ 加入 sys.path）
+src/memory.py          只读跨进程内存原语（ctypes）
+src/offsets.py         fm_offsets_info.json 加载与版本选择
+src/session.py         游戏会话：附加进程、exe 版本、游戏内日期
+src/clubs.py           俱乐部记录读取（uid、队名）
+src/user_club.py       检测：人控经理向量 ∩ 球队教练指针
+tools/fm_probe_user.py 诊断脚本
+tests/test_basics.py   单元测试（无需游戏）
+fm_offsets_info.json   偏移参考表（FM Scouting Tool 数据）
+config.json            配置持久化（club_uid 等）
+```
+
+检测原理：`[exe+mgr_hnp_rva]` → 人控经理对象向量；球员记录签名扫描枚举全部球队；
+球队 +0x80 的 `manager_ptr` 等于（或内部引用）向量元素的即为用户执教的球队 → 归一化到父俱乐部 UID 与队名。
+
+> 阵容深度分析（EA 计算 / 匈牙利选阵 / HTML 报告）仍在 develop 分支，本分支只保留俱乐部检测功能。
