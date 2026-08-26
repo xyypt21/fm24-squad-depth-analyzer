@@ -3,8 +3,7 @@
 用已知正确的俱乐部 uid（默认取 config.json 的 club_uid）做基准，逐环节验证：
   1. 人控经理链（mgr_hnp -> 向量）
   2. 基准俱乐部的 TEAM 记录与其 manager_ptr 实际指向
-  3. 两者是否相交（检测算法的核心假设）
-  4. 存档单例对象（savegame_id 链）附近是否有俱乐部 uid 字段
+  3. 两者交集（检测算法的核心假设）
 
 用法：
     python fm_probe_user.py                # 用 config.json 的 club_uid
@@ -15,14 +14,16 @@ import argparse
 import contextlib
 import sys
 
+from fmlib.clubs import read_club_name, read_club_uid, type_id_ok
+from fmlib.offsets import _int
 from fmlib.session import GameSession
 from fmlib.user_club import (
+    MANAGER_BLOCK,
     _manager_block_hit,
     _match_clubs,
     human_manager_ptrs,
     iter_teams,
     resolve_manager,
-    walk_team_table,
 )
 
 for stream in (sys.stdout, sys.stderr):
@@ -81,23 +82,29 @@ def probe_chain(mem, session, base, off):
         return set()
 
 
-def _hnp_tag_ok(session, addr):
-    tag = session.offsets.hnp_type_id
-    return bool(tag) and session.mem.read_u32(addr) == tag
+def team_of_club(mem, session, off, club_uid):
+    """在球员记录扫描出的球队里找父俱乐部 uid 匹配的第一支。"""
+    for t in iter_teams(session):
+        club = mem.read_ptr(t + off.team_club_ptr_off)
+        if not club or not type_id_ok(mem, session.base, club, off.club_type_id):
+            continue
+        if read_club_uid(mem, off, club) == club_uid:
+            return t
+    return None
 
 
 def probe_truth(mem, session, off, club_uid, pset):
     """环节 2：基准俱乐部的 TEAM 与 manager_ptr 实际指向。"""
-    import fm24_probe
-
     print(f"\n[2] 基准俱乐部 {club_uid} 的球队记录")
-    name, players = fm24_probe.club_squad(mem, club_uid)
-    print(f"    club_squad: name={name} players={len(players)}")
-    team_entry = next((p["club_entry"] for p in players if p.get("club_entry")), None)
+    team_entry = team_of_club(mem, session, off, club_uid)
     if not team_entry:
-        print("    !! 没拿到 club_entry（TEAM 地址），无法继续基准验证")
+        print("    !! 没找到该俱乐部对应的球队（uid 是否正确/存档是否已载入？）")
         return
-    print(f"    TEAM 条目地址 = 0x{team_entry:X}")
+    name = None
+    club_addr = mem.read_ptr(team_entry + off.team_club_ptr_off)
+    if club_addr:
+        name = read_club_name(mem, off, club_addr)
+    print(f"    TEAM 条目地址 = 0x{team_entry:X}  俱乐部名: {name or '?'}")
     dump_words(mem, team_entry, 0x90, marks=(club_uid,), label="TEAM 头部")
     mp_raw = mem.read_ptr(team_entry + off.team_manager_ptr_off)
     mp_s = f"0x{mp_raw:X}" if mp_raw else "None"
@@ -105,30 +112,31 @@ def probe_truth(mem, session, off, club_uid, pset):
     if not mp_raw:
         return
     dump_words(mem, mp_raw, 0x60, label="manager 对象头部")
-    inner = mem.read_ptr(mp_raw)
-    ok_direct = _hnp_tag_ok(session, mp_raw)
-    ok_inner = bool(inner and inner >= MIN_PTR and _hnp_tag_ok(session, inner))
-    print(f"    类型标记: 直接命中={ok_direct} 解引用一层命中={ok_inner}")
+    head_u32 = mem.read_u32(mp_raw)
+    entity_tag = _int(off.raw["vtable_rvas"]["entity_hnp"]) | 0x40000000
+    print(f"    对象头 u32={head_u32:#010x}（entity_hnp tag 应为 {entity_tag:#010x}）")
     mgr = resolve_manager(mem, session, team_entry)
     print(f"    resolve_manager -> {hex(mgr) if mgr else None}")
     if mgr is None:
         return
-    if pset:
-        hit = _manager_block_hit(mem, mgr, pset)
-        if hit:
-            person, block_off = hit
-            print(
-                f"    教练对象块内命中人控指针: 0x{person:X} @块+0x{block_off:X}"
-                " —— 该队应被判为用户球队"
-            )
-        else:
-            print(f"    教练对象头部 {0x400:#x} 字节内未发现人控向量指针")
-        _refs_of_vector_ptr(mem, session, off, pset, mgr)
-        if not hit:
-            refs = mem.find_qword(mgr, max_hits=64)
-            print(f"    教练对象地址的全内存引用 {len(refs)} 处:")
-            for h in refs[:16]:
-                print(f"      0x{h:X}")
+
+    hit = _manager_block_hit(mem, mgr, pset)
+    if hit:
+        person, block_off = hit
+        print(
+            f"    教练对象块内命中人控指针: 0x{person:X} @块+0x{block_off:X}"
+            " —— 该队应被判为用户球队"
+        )
+    elif mgr in pset:
+        print("    教练对象即人控向量元素（直接相等）—— 该队应被判为用户球队")
+    else:
+        print(f"    教练对象头部 {MANAGER_BLOCK:#x} 字节内未发现人控向量指针")
+        refs = mem.find_qword(mgr, max_hits=64)
+        print(f"    教练对象地址的全内存引用 {len(refs)} 处:")
+        for h in refs[:16]:
+            print(f"      0x{h:X}")
+
+    _refs_of_vector_ptr(mem, session, off, pset, mgr)
 
 
 def _refs_of_vector_ptr(mem, session, off, pset, mgr=None):
@@ -142,87 +150,22 @@ def _refs_of_vector_ptr(mem, session, off, pset, mgr=None):
         return
     for p in sorted(pset)[:4]:
         refs = mem.find_qword(p, max_hits=64)
-        inside = [h for h in refs if (b <= h < e) or (mgr and mgr <= h < mgr + 0x400)]
+        inside = [h for h in refs if (b <= h < e) or (mgr and mgr <= h < mgr + MANAGER_BLOCK)]
         others = [h for h in refs if h not in inside]
-        where = f"向量/教练块内 {len(inside)} 处" + (
-            f"（教练块偏移: {[hex(h - mgr) for h in refs if mgr and mgr <= h < mgr + 0x400][:3]}）"
-            if any(mgr and mgr <= h < mgr + 0x400 for h in refs)
-            else ""
-        )
+        in_mgr = [hex(h - mgr) for h in refs if mgr and mgr <= h < mgr + MANAGER_BLOCK]
+        where = f"向量/教练块内 {len(inside)} 处"
+        if in_mgr:
+            where += f"（教练块偏移: {in_mgr[:3]}）"
         print(f"    人控指针 0x{p:X}: {where}，其他引用 {len(others)} 处")
         for h in others[:8]:
             print(f"      引用@ 0x{h:X}")
 
 
 def probe_intersection(mem, session, off, pset):
-    """环节 3：检测算法本体试算（球员记录来源）。"""
-    from fmlib.clubs import read_club_name, read_club_uid
-
-    print("\n[3] 全量交集试算（球员记录扫描来源）")
-    teams = iter_teams(session, log=lambda s: print("   ", s))
-    hits = []
-    for t in teams:
-        m = resolve_manager(mem, session, t)
-        if m and m in pset:
-            hits.append((t, m))
-    print(f"    教练在人控集合中的球队: {len(hits)} 支")
-    for t, m in hits[:20]:
-        club = mem.read_ptr(t + off.team_club_ptr_off)
-        uid = read_club_uid(mem, off, club) if club else None
-        nm = read_club_name(mem, off, club) if club else None
-        print(f"      TEAM=0x{t:X} coach=0x{m:X} club={uid} {nm or '?'}")
-    return set(teams)
-
-
-def probe_team_table(mem, session, off, pset, scanned_teams):
-    """环节 5：全局球队表遍历 + 与球员扫描交叉验证 + 仅用表的检测试算。"""
-    from fmlib.clubs import read_club_name, read_club_uid
-
-    print("\n[5] 全局球队表 [exe+team_root] -> 容器 -> 表")
-    try:
-        records, info = walk_team_table(session, log=lambda s: print("   ", s))
-    except Exception as exc:
-        print(f"    !! 全局球队表失败: {exc}")
-        return
-    if info.notes:
-        for n in info.notes:
-            print(f"    note: {n}")
-
-    # 样例行：uid / 类型 / 父俱乐部 uid / 名字
-    print("    前 8 行样例:")
-    for t in records[:8]:
-        uid_t = mem.read_u32(t + off.team_uid_off)
-        ttype = mem.read_u8(t + off.team_type_off)
-        club = mem.read_ptr(t + off.team_club_ptr_off)
-        cuid = read_club_uid(mem, off, club) if club else None
-        nm = read_club_name(mem, off, club) if club else None
-        print(f"      0x{t:X} uid={uid_t} type={ttype} club={cuid} {nm or '?'}")
-
-    # 与球员记录扫描的球队集合求交（同一对象则地址应重合）
-    if scanned_teams:
-        overlap = len(set(records) & set(scanned_teams))
-        only_scan = len(set(scanned_teams) - set(records))
-        print(
-            f"    与球员记录扫描球队地址交集: {overlap}"
-            f"（仅扫描有: {only_scan}，表: {len(records)}，扫描: {len(scanned_teams)}）"
-        )
-
-    matches = _match_clubs(session, pset, records)
-    print(f"    仅用球队表的检测结果: {[m.uid for m in matches]}")
-
-
-def probe_savegame_singleton(mem, base, off, club_uid):
-    """环节 4：存档单例对象附近找俱乐部 uid 字段。"""
-    from fmlib.offsets import _int
-
-    print("\n[4] savegame 单例对象找俱乐部 uid 字段")
-    sg_rva = _int(off.raw["savegame_id_chain"]["savegame_id_rva"])
-    sg = mem.read_ptr(base + sg_rva)
-    if not sg:
-        print("    q1 读取失败")
-        return
-    print(f"    q1 = 0x{sg:X}")
-    dump_words(mem, sg, 0x140, marks=(club_uid,), label="q1 头部")
+    """环节 3：检测算法本体试算。"""
+    print("\n[3] 全量交集试算（检测算法本体）")
+    matches = _match_clubs(session, pset, iter_teams(session), log=print)
+    print(f"    结果: {[(m.uid, m.name) for m in matches]}")
 
 
 def main():
@@ -247,9 +190,7 @@ def main():
 
         pset = probe_chain(mem, session, base, off)
         probe_truth(mem, session, off, club_uid, pset)
-        scanned_teams = probe_intersection(mem, session, off, pset)
-        probe_team_table(mem, session, off, pset, scanned_teams)
-        probe_savegame_singleton(mem, base, off, club_uid)
+        probe_intersection(mem, session, off, pset)
 
 
 if __name__ == "__main__":

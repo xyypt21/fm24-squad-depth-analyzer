@@ -53,23 +53,6 @@ def uid_sane(uid) -> bool:
     return uid is not None and 0 < uid < MAX_UID
 
 
-def read_team_uid(mem: FmMemory, off: Offsets, team_addr: int) -> Optional[int]:
-    """TEAM 记录 -> 自身 uid（一线/预备/青年队各有独立 uid）。"""
-    if not team_addr:
-        return None
-    return mem.read_u32(team_addr + off.team_uid_off)
-
-
-def read_team_club(mem: FmMemory, off: Offsets, team_addr: int):
-    """TEAM 记录 -> 父俱乐部记录地址（CLUB），失败/类型不符返回 None。"""
-    if not team_addr:
-        return None
-    club = mem.read_ptr(team_addr + off.team_club_ptr_off)
-    if not club:
-        return None
-    return club
-
-
 def read_club_uid(mem: FmMemory, off: Offsets, club_addr: int) -> Optional[int]:
     """CLUB 记录 -> 俱乐部 uid。"""
     if not club_addr:

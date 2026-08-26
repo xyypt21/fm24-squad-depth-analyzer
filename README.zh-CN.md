@@ -1,118 +1,39 @@
-# FM24 阵容深度分析器
+# FM24 俱乐部 ID 检测器（tmp 分支）
 
-分析 Football Manager 2024 球队的阵容深度，为 4-2-3-1 阵型按 CA 和 EA 分别选出最佳与次佳 11 人，并生成可视化 HTML 报告。
+只读访问运行中的 FM24 进程内存，自动检测玩家（人控经理）执教的俱乐部，在 GUI 中显示其 ID 与队名。
 
-## 功能
-
-- 直接从运行中的 FM24 游戏内存读取阵容（无需导出 RTF）
-  - 按俱乐部 UID 过滤（可配置），仅保留合同与当前俱乐部都匹配的球员（排除外租与租入）
-  - 从内存读取游戏日期，精确计算球员年龄
-  - 自动把入选阵容的球员英文名翻译成中文（Google 翻译，经本地代理）
-- 计算每个球员的 EA（预期能力）：
-  - `年龄 < 成长至年龄` → `EA = CA + (成长至年龄 - 年龄) × 每年成长`（不超过 PA）
-  - `年龄 ≥ 成长至年龄` → `EA = CA`
-  - 成长至年龄（默认 21）与每年成长值（默认 20）均可调整
-- `min_age` 最小年龄过滤（默认 17），剔除过年轻球员
-- 用匈牙利算法分配 CA / EA 的最佳 11 人、次佳 11 人
-- 输出可视化 HTML 报告（四个球场阵型图）
-- 图形界面（tkinter）与命令行两种使用方式
-
-## 环境要求
-
-- Python 3.8+
-- Windows（内存读取依赖 Windows API）
-- 依赖：`numpy`、`scipy`
+## 使用
 
 ```bash
-pip install numpy scipy
+pythonw fm_club_gui.pyw
 ```
 
-## 使用方法
+1. 启动 FM24 并载入存档。
+2. 点击"连接游戏并检测"。
+3. 若有多家候选（网络球等），下拉选择；ID 会填入输入框。
+4. "保存为默认俱乐部 ID"写回 `config.json`。
 
-### 图形界面
+检测失败或游戏更新后偏移失效时，运行诊断：
 
 ```bash
-python fm_analysis_gui.py
+python fm_probe_user.py --club 920
 ```
 
-在界面中：
-1. 输入俱乐部 ID（默认读取 `config.json` 中保存的值）
-2. 调整 EA 公式参数（最小年龄、成长至年龄、每年成长）
-3. 可点击"查询名字"从内存反查俱乐部名
-4. 点击"开始分析"，完成后自动打开 HTML 报告
-
-### 命令行
-
-```bash
-python fm_cli.py
-```
-
-从 `config.json` 读取俱乐部 ID（默认 `club_uid` 920），结果写入 `fm_analysis.html` 并自动打开。
-
-指定俱乐部：
-
-```bash
-python fm_cli.py --club <uid>
-```
-
-查找自己俱乐部的 UID：
-
-```bash
-python fm24_probe.py --roster
-```
-
-### 作为模块调用
-
-```python
-from fm_roster import read_squad_from_memory
-from fm_analysis import analyze
-
-name, roster = read_squad_from_memory(club_uid=920)
-html = analyze(roster, min_age=17, growth_until_age=21, growth_per_year=20)
-```
-
-## 配置文件
-
-`config.json` 保存 GUI/CLI 的默认设置，运行时可自动读写：
-
-```json
-{
-  "club_uid": 920,
-  "min_age": 17,
-  "growth_until_age": 21,
-  "growth_per_year": 20
-}
-```
-
-- `club_uid`：要分析的 FM 俱乐部 UID
-- `min_age`：仅考虑年龄不小于该值的球员（默认 17）
-- `growth_until_age`：EA 成长停止年龄（默认 21）
-- `growth_per_year`：EA 每岁成长值（默认 20）
-
-文件缺失或损坏时自动回退到默认值。
-
-## 项目结构
+## 结构
 
 ```
-fm_analysis_gui.py   tkinter 图形界面
-fm_cli.py            命令行入口
-fm_roster.py         内存读取：阵容与俱乐部名
-fm_analysis.py       核心：配置、位置解析、EA 计算、阵容分配、
-                     球员名翻译、HTML 报告渲染
-fm_memory.py         通用只读内存读取层（ctypes，Windows API）
-fm24_probe.py        FM24 专属偏移、内存扫描与阵容提取
-fm_offsets_info.json FM Scouting Tool 参考偏移表
-fm_analysis.html     生成的报告输出（被 gitignore 忽略）
-config.json          配置文件
-templates/style.css      报告样式表
-templates/report.html    报告 HTML 骨架（占位符替换）
+fm_club_gui.pyw       GUI 入口
+fmlib/memory.py       只读跨进程内存原语（ctypes）
+fmlib/offsets.py      fm_offsets_info.json 加载与版本选择
+fmlib/session.py      游戏会话：附加进程、exe 版本、游戏内日期
+fmlib/clubs.py        俱乐部记录读取（uid、队名）
+fmlib/user_club.py    检测：人控经理向量 ∩ 球队教练指针
+fm_probe_user.py      诊断脚本
+fm_offsets_info.json  偏移参考表（FM Scouting Tool 数据）
+config.json           配置持久化（club_uid 等）
 ```
 
-## 球员名翻译
+检测原理：`[exe+mgr_hnp_rva]` → 人控经理对象向量；球员记录签名扫描枚举全部球队；
+球队 +0x80 的 `manager_ptr` 等于（或内部引用）向量元素的即为用户执教的球队 → 归一化到父俱乐部 UID 与队名。
 
-入选最终阵容的球员名字会用 Google 翻译（`deep-translator`）并发批量翻译成中文，经本地代理（默认 `http://127.0.0.1:7897`，可用环境变量 `FM_PROXY` 覆盖）。翻译失败保留原名，不写任何文件。
-
-## 注意事项
-
-- 游戏需已启动并载入存档。若游戏以管理员权限运行，本工具也需以管理员权限运行。
-- `fm24_probe.py` 中的偏移锁定当前 FM24 构建（Epic 版）。游戏更新导致失效时，需按文件内注释重新观察偏移。
+> 阵容深度分析（EA 计算 / 匈牙利选阵 / HTML 报告）仍在 develop 分支，本分支只保留俱乐部检测功能。

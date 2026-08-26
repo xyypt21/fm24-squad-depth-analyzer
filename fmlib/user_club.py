@@ -25,7 +25,6 @@ from fmlib.clubs import (
 from fmlib.memory import FmMemory
 from fmlib.offsets import Offsets
 from fmlib.session import GameSession
-from fmlib.tables import TableError, walk_table
 
 # 球员记录（entity_ap）特征签名与布局，与 fm24_probe.py 同源（实测验证）
 PLAYER_SIGNATURE = b"\x58\xe9\xa4\x45"  # 记录头 u32 = 0x45A4E958
@@ -175,28 +174,6 @@ def _manager_block_hit(mem: FmMemory, block_addr: int, pset: Set[int], size: int
     return None
 
 
-def walk_team_table(session: GameSession, log: LogFn = None):
-    """走全局球队表，返回 (record_addr_list, TableInfo)。失败抛 TableError。"""
-    off = session.offsets
-    if off.team_table_root_rva is None:
-        raise TableError("偏移表没有 team_table_chain 节")
-    records, info = walk_table(
-        session.mem,
-        session.base,
-        off.team_table_root_rva,
-        off.table_container_off,
-        off.team_type_id,
-    )
-    _log(
-        log,
-        f"[table] 全局球队表: mode={info.mode} stride=0x{info.stride:X} "
-        f"count={info.count} start=0x{info.start:X}"
-        + ("(截断)" if info.truncated else "")
-        + ("; ".join(info.notes) if info.notes else ""),
-    )
-    return records, info
-
-
 # ── 主入口 ────────────────────────────────────────────
 def _match_clubs(
     session: GameSession,
@@ -257,32 +234,18 @@ def _match_clubs(
 def detect_user_clubs(session: GameSession, log: LogFn = None) -> List[ClubInfo]:
     """检测用户（人控经理）执教的俱乐部，返回去重列表（单人游戏通常 1 项）。
 
-    球队来源依次尝试：全局球队表 -> 球员记录签名扫描。
+    球队来源：球员记录签名扫描（+0x130 当前球队条目去重）。
     """
     pset = human_manager_ptrs(session, log=log)
-
-    sources: List[tuple] = []
-    try:
-        records, _ = walk_team_table(session, log=log)
-        sources.append(("全局球队表", records))
-    except TableError as exc:
-        _log(log, f"[table] 全局球队表不可用，回退球员记录扫描: {exc}")
-    sources.append(("球员记录扫描", None))
-
-    last_teams: Dict[int, int] = {}
-    for label, records in sources:
-        teams = records if records is not None else iter_teams(session, log=log)
-        matches = _match_clubs(session, pset, teams, log=log)
-        if isinstance(teams, dict):
-            last_teams = teams
-        if matches:
-            _log(log, f"[done] 经 {label} 命中 {len(matches)} 家俱乐部")
-            return matches
-        _log(log, f"[done] {label} 未命中")
+    teams = iter_teams(session, log=log)
+    matches = _match_clubs(session, pset, teams, log=log)
+    if matches:
+        _log(log, f"[done] 命中 {len(matches)} 家俱乐部")
+        return matches
 
     raise DetectionError(
         f"未找到交集：人控经理集合 {len(pset)} 个指针，"
-        f"{len(last_teams)} 支球队的教练对象内存块里都没有这些指针。"
+        f"{len(teams)} 支球队的教练对象内存块里都没有这些指针。"
         "可能：① 你当前无执教俱乐部（失业）；② 教练实体与 person 的关联"
         "不在对象头部（请运行 fm_probe_user.py 输出诊断信息）；"
         "③ 偏移与游戏版本不匹配。"
