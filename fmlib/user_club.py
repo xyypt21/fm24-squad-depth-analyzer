@@ -37,6 +37,7 @@ RECORD_HEAD_NEED = P_CUR_TEAM_ENTRY + 8  # 只需读到 +0x138
 MAX_VECTOR_BYTES = 32 * 1024 * 1024  # 向量整读上限（异常大时截断并告警）
 MIN_PTR = 0x10000
 MAX_PTR = 0x7FF000000000
+MANAGER_BLOCK = 0x400  # 教练对象头部扫描范围：在其中找指向人控记录的指针
 
 LogFn = Optional[Callable[[str], None]]
 
@@ -100,9 +101,11 @@ def human_manager_ptrs(session: GameSession, log: LogFn = None) -> Set[int]:
         for i in range(0, len(buf) - 7, 8)
         if MIN_PTR <= int.from_bytes(buf[i : i + 8], "little") < MAX_PTR
     }
+    sample = " ".join(f"0x{p:X}" for p in sorted(ptrs)[:5])
     _log(
         log,
-        f"[chain] 人控经理向量: {len(buf) // 8} 槽 / 合法指针 {len(ptrs)} 个{truncated}",
+        f"[chain] 人控经理向量: {len(buf) // 8} 槽 / 合法指针 {len(ptrs)} 个{truncated}"
+        + (f" 样例: {sample}" if sample else ""),
     )
     if not ptrs:
         raise DetectionError("人控经理向量里没有合法指针（内容可能不是对象数组）。")
@@ -143,25 +146,33 @@ def iter_teams(session: GameSession, log: LogFn = None) -> Dict[int, int]:
 
 
 def resolve_manager(mem: FmMemory, session: GameSession, team_addr: int) -> Optional[int]:
-    """TEAM -> 教练对象；容忍一层包装（指向持有者，->[0] 才是 person）。"""
+    """TEAM -> 教练对象地址（entity_hnp）。
+
+    实测 manager_ptr 指向的是教练的 ENTITY 记录（头 tag 0x45A6A318），
+    不是人控向量里的 PERSON 对象，因此这里不做类型强校验。
+    """
     off = session.offsets
     mp = mem.read_ptr(team_addr + off.team_manager_ptr_off)
-    if not mp or mp < MIN_PTR:
-        return None
-    if _person_tag_ok(session, mp):
+    if mp and MIN_PTR <= mp < MAX_PTR:
         return mp
-    inner = mem.read_ptr(mp)
-    if inner and inner >= MIN_PTR and _person_tag_ok(session, inner):
-        return inner
     return None
 
 
-def _person_tag_ok(session: GameSession, addr: int) -> bool:
-    """校验 HNP person 记录头；偏移表没有该类型标记时放行（宽松模式）。"""
-    tag = session.offsets.hnp_type_id
-    if tag is None:
-        return True
-    return type_id_ok(session.mem, session.base, addr, tag)
+def _manager_block_hit(mem: FmMemory, block_addr: int, pset: Set[int], size: int = MANAGER_BLOCK):
+    """在 [block_addr, +size) 里找第一个属于 pset 的 8 字节值。
+
+    返回 (命中值, 块内偏移) 或 None。用于把"教练 ENTITY 对象"与
+    "人控经理向量里的 PERSON 指针"关联起来——实体块内某处存有
+    指向其 person 的指针，无需知道具体偏移。
+    """
+    buf = mem.read_bytes(block_addr, size)
+    if not buf:
+        return None
+    for i in range(0, len(buf) - 7, 8):
+        v = int.from_bytes(buf[i : i + 8], "little")
+        if v in pset:
+            return v, i
+    return None
 
 
 def walk_team_table(session: GameSession, log: LogFn = None):
@@ -193,20 +204,31 @@ def _match_clubs(
     team_addrs: Iterable[int],
     log: LogFn = None,
 ) -> List[ClubInfo]:
-    """在人控经理集合与球队教练之间取交集，归出俱乐部列表。"""
+    """在人控经理集合与球队教练之间取交集，归出俱乐部列表。
+
+    匹配规则：教练对象（TEAM+0x80）内存块头部 MANAGER_BLOCK 字节里
+    出现人控向量中的指针，即视为同一人（实体块内存有指向其 person
+    的引用，具体偏移无关紧要）。
+    """
     off = session.offsets
     mem = session.mem
     matches: List[ClubInfo] = []
     seen_clubs: Set[int] = set()
+    seen_managers: Set[int] = set()
     for team_addr in team_addrs:
         manager = resolve_manager(mem, session, team_addr)
-        if not manager or manager not in pset:
+        if not manager or manager in seen_managers:
             continue
+        seen_managers.add(manager)
+        hit = _manager_block_hit(mem, manager, pset)
+        if not hit:
+            continue
+        person, block_off = hit
         club = mem.read_ptr(team_addr + off.team_club_ptr_off)
         if not club or not type_id_ok(mem, session.base, club, off.club_type_id):
             _log(
                 log,
-                f"[hit] 球队 0x{team_addr:X} 的教练 0x{manager:X} 在人控集合中，"
+                f"[hit] 球队 0x{team_addr:X} 教练块+0x{block_off:X} 命中人控指针，"
                 "但没有有效俱乐部链接（可能是国家队）",
             )
             continue
@@ -220,7 +242,7 @@ def _match_clubs(
                 name=read_club_name(mem, off, club),
                 team_addr=team_addr,
                 club_addr=club,
-                person_addr=manager,
+                person_addr=person,
             )
         )
     return matches
@@ -254,8 +276,8 @@ def detect_user_clubs(session: GameSession, log: LogFn = None) -> List[ClubInfo]
 
     raise DetectionError(
         f"未找到交集：人控经理集合 {len(pset)} 个指针，"
-        f"{len(last_teams)} 支球队的教练都不在其中。"
-        "可能：① 你当前无执教俱乐部（失业）；② manager_ptr 指向的对象"
-        "与向量元素不同层（请运行 fm_probe_user.py 输出诊断信息）；"
+        f"{len(last_teams)} 支球队的教练对象内存块里都没有这些指针。"
+        "可能：① 你当前无执教俱乐部（失业）；② 教练实体与 person 的关联"
+        "不在对象头部（请运行 fm_probe_user.py 输出诊断信息）；"
         "③ 偏移与游戏版本不匹配。"
     )

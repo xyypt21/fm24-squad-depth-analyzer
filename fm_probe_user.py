@@ -17,6 +17,7 @@ import sys
 
 from fmlib.session import GameSession
 from fmlib.user_club import (
+    _manager_block_hit,
     _match_clubs,
     human_manager_ptrs,
     iter_teams,
@@ -110,16 +111,28 @@ def probe_truth(mem, session, off, club_uid, pset):
     print(f"    类型标记: 直接命中={ok_direct} 解引用一层命中={ok_inner}")
     mgr = resolve_manager(mem, session, team_entry)
     print(f"    resolve_manager -> {hex(mgr) if mgr else None}")
-    if mgr is None or mgr in pset:
-        if mgr is not None:
-            print("    该教练在人控经理向量集合中: True")
+    if mgr is None:
         return
+    if pset:
+        hit = _manager_block_hit(mem, mgr, pset)
+        if hit:
+            person, block_off = hit
+            print(
+                f"    教练对象块内命中人控指针: 0x{person:X} @块+0x{block_off:X}"
+                " —— 该队应被判为用户球队"
+            )
+        else:
+            print(f"    教练对象头部 {0x400:#x} 字节内未发现人控向量指针")
+        _refs_of_vector_ptr(mem, session, off, pset, mgr)
+        if not hit:
+            refs = mem.find_qword(mgr, max_hits=64)
+            print(f"    教练对象地址的全内存引用 {len(refs)} 处:")
+            for h in refs[:16]:
+                print(f"      0x{h:X}")
 
-    print("    该教练在人控经理向量集合中: False")
-    refs = mem.find_qword(mgr, max_hits=64)
-    print(f"    该教练地址的全内存引用 {len(refs)} 处:")
-    for h in refs[:16]:
-        print(f"      0x{h:X}")
+
+def _refs_of_vector_ptr(mem, session, off, pset, mgr=None):
+    """反查：人控指针本身被哪些地址引用（找 person<->entity 关联层）。"""
     ctx2 = mem.read_ptr(session.base + off.mgr_hnp_rva)
     if not ctx2:
         return
@@ -127,10 +140,18 @@ def probe_truth(mem, session, off, club_uid, pset):
     e = mem.read_ptr(ctx2 + off.hmgr_end_off)
     if not (b and e):
         return
-    inside = [h for h in refs if b <= h < e]
-    sample = [hex(h - b) for h in inside[:5]]
-    tail = f" 偏移样例: {sample}" if inside else ""
-    print(f"      落在向量区间 [0x{b:X},0x{e:X}) 内: {len(inside)} 处{tail}")
+    for p in sorted(pset)[:4]:
+        refs = mem.find_qword(p, max_hits=64)
+        inside = [h for h in refs if (b <= h < e) or (mgr and mgr <= h < mgr + 0x400)]
+        others = [h for h in refs if h not in inside]
+        where = f"向量/教练块内 {len(inside)} 处" + (
+            f"（教练块偏移: {[hex(h - mgr) for h in refs if mgr and mgr <= h < mgr + 0x400][:3]}）"
+            if any(mgr and mgr <= h < mgr + 0x400 for h in refs)
+            else ""
+        )
+        print(f"    人控指针 0x{p:X}: {where}，其他引用 {len(others)} 处")
+        for h in others[:8]:
+            print(f"      引用@ 0x{h:X}")
 
 
 def probe_intersection(mem, session, off, pset):
