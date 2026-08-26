@@ -12,14 +12,12 @@
 import json
 import queue
 import sys
-import tempfile
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
-sys.pycache_prefix = str(Path(tempfile.gettempdir()) / "fm24-club-detector")
 
 from session import attach_session  # noqa: E402
 from user_club import DetectionError, detect_user_clubs  # noqa: E402

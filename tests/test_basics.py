@@ -6,15 +6,13 @@
 import os
 import struct
 import sys
-import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-sys.pycache_prefix = str(Path(tempfile.gettempdir()) / "fm24-club-detector")
 
-import memory  # noqa: E402
-import user_club  # noqa: E402
-from offsets import load_offsets, type_tag  # noqa: E402
+import memory
+import user_club
+from offsets import load_offsets, type_tag
 
 
 def test_segmentize():
