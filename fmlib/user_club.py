@@ -220,7 +220,13 @@ def _match_clubs(
         if not manager or manager in seen_managers:
             continue
         seen_managers.add(manager)
-        hit = _manager_block_hit(mem, manager, pset)
+        # 实测：人控向量里的指针就是教练 ENTITY 本身，直接相等即命中；
+        # 块内引用扫描作为兜底（兼容向量存 person 等关联对象的版本）。
+        if manager in pset:
+            hit = (manager, 0)
+        else:
+            found = _manager_block_hit(mem, manager, pset)
+            hit = found if found else None
         if not hit:
             continue
         person, block_off = hit
