@@ -4,10 +4,10 @@
 1. [exe+mgr_hnp_rva] -> 管理器上下文；上下文 +hmgr_start_off / +hmgr_end_off
    是一个指针向量的 begin/end。整块读出，解析成"疑似人控经理对象地址"集合。
    （不逐个校验类型——向量可能很大，逐项 syscall 太慢；只做指针合法性过滤。）
-2. 用球员记录特征签名（entity_ap tagged id，与 fm24_probe.py 同源）全内存扫描，
-   从每条记录 +0x130 取"当前球队条目"(TEAM) 指针，去重后得到全部球队；
-   读 TEAM+team_manager_ptr_off 得到该队主教练对象。
-3. 交集：主教练对象落在第 1 步集合里的球队，即人控经理执教的球队 ->
+2. 枚举全部球队及其主教练：
+   a. 首选全局球队表 [exe+team_root_rva] -> 容器(+0x80) -> 表 -> 记录；
+   b. 表不可用时回退球员记录签名扫描，从每条 +0x130 取"当前球队条目"(TEAM)。
+3. 交集：教练对象落在第 1 步集合里的球队，即人控经理执教的球队 ->
    归一化到父俱乐部 uid + 名字。单人游戏通常恰命中一家。
 
 注意：偏移锁定当前 FM24 构建；游戏更新后需更新 fm_offsets_info.json。
@@ -25,6 +25,7 @@ from fmlib.clubs import (
 from fmlib.memory import FmMemory
 from fmlib.offsets import Offsets
 from fmlib.session import GameSession
+from fmlib.tables import TableError, walk_table
 
 # 球员记录（entity_ap）特征签名与布局，与 fm24_probe.py 同源（实测验证）
 PLAYER_SIGNATURE = b"\x58\xe9\xa4\x45"  # 记录头 u32 = 0x45A4E958
@@ -163,17 +164,41 @@ def _person_tag_ok(session: GameSession, addr: int) -> bool:
     return type_id_ok(session.mem, session.base, addr, tag)
 
 
+def walk_team_table(session: GameSession, log: LogFn = None):
+    """走全局球队表，返回 (record_addr_list, TableInfo)。失败抛 TableError。"""
+    off = session.offsets
+    if off.team_table_root_rva is None:
+        raise TableError("偏移表没有 team_table_chain 节")
+    records, info = walk_table(
+        session.mem,
+        session.base,
+        off.team_table_root_rva,
+        off.table_container_off,
+        off.team_type_id,
+    )
+    _log(
+        log,
+        f"[table] 全局球队表: mode={info.mode} stride=0x{info.stride:X} "
+        f"count={info.count} start=0x{info.start:X}"
+        + ("(截断)" if info.truncated else "")
+        + ("; ".join(info.notes) if info.notes else ""),
+    )
+    return records, info
+
+
 # ── 主入口 ────────────────────────────────────────────
-def detect_user_clubs(session: GameSession, log: LogFn = None) -> List[ClubInfo]:
-    """检测用户（人控经理）执教的俱乐部，返回去重列表（单人游戏通常 1 项）。"""
+def _match_clubs(
+    session: GameSession,
+    pset: Set[int],
+    team_addrs: Iterable[int],
+    log: LogFn = None,
+) -> List[ClubInfo]:
+    """在人控经理集合与球队教练之间取交集，归出俱乐部列表。"""
     off = session.offsets
     mem = session.mem
-    pset = human_manager_ptrs(session, log=log)
-    teams = iter_teams(session, log=log)
-
     matches: List[ClubInfo] = []
     seen_clubs: Set[int] = set()
-    for team_addr in teams:
+    for team_addr in team_addrs:
         manager = resolve_manager(mem, session, team_addr)
         if not manager or manager not in pset:
             continue
@@ -198,15 +223,39 @@ def detect_user_clubs(session: GameSession, log: LogFn = None) -> List[ClubInfo]
                 person_addr=manager,
             )
         )
-
-    if not matches:
-        raise DetectionError(
-            f"未找到交集：人控经理集合 {len(pset)} 个指针，"
-            f"{len(teams)} 支球队的教练都不在其中。"
-            "可能：① 你当前无执教俱乐部（失业）；② manager_ptr 指向的对象"
-            "与向量元素不同层（请运行 fm_probe_user.py 输出诊断信息）；"
-            "③ 偏移与游戏版本不匹配。"
-        )
-    if len(matches) > 1:
-        _log(log, f"[done] 命中 {len(matches)} 家（网络球或向量含全部职员），请人工选择")
     return matches
+
+
+def detect_user_clubs(session: GameSession, log: LogFn = None) -> List[ClubInfo]:
+    """检测用户（人控经理）执教的俱乐部，返回去重列表（单人游戏通常 1 项）。
+
+    球队来源依次尝试：全局球队表 -> 球员记录签名扫描。
+    """
+    pset = human_manager_ptrs(session, log=log)
+
+    sources: List[tuple] = []
+    try:
+        records, _ = walk_team_table(session, log=log)
+        sources.append(("全局球队表", records))
+    except TableError as exc:
+        _log(log, f"[table] 全局球队表不可用，回退球员记录扫描: {exc}")
+    sources.append(("球员记录扫描", None))
+
+    last_teams: Dict[int, int] = {}
+    for label, records in sources:
+        teams = records if records is not None else iter_teams(session, log=log)
+        matches = _match_clubs(session, pset, teams, log=log)
+        if isinstance(teams, dict):
+            last_teams = teams
+        if matches:
+            _log(log, f"[done] 经 {label} 命中 {len(matches)} 家俱乐部")
+            return matches
+        _log(log, f"[done] {label} 未命中")
+
+    raise DetectionError(
+        f"未找到交集：人控经理集合 {len(pset)} 个指针，"
+        f"{len(last_teams)} 支球队的教练都不在其中。"
+        "可能：① 你当前无执教俱乐部（失业）；② manager_ptr 指向的对象"
+        "与向量元素不同层（请运行 fm_probe_user.py 输出诊断信息）；"
+        "③ 偏移与游戏版本不匹配。"
+    )

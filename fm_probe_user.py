@@ -16,7 +16,13 @@ import contextlib
 import sys
 
 from fmlib.session import GameSession
-from fmlib.user_club import human_manager_ptrs, iter_teams, resolve_manager
+from fmlib.user_club import (
+    _match_clubs,
+    human_manager_ptrs,
+    iter_teams,
+    resolve_manager,
+    walk_team_table,
+)
 
 for stream in (sys.stdout, sys.stderr):
     with contextlib.suppress(Exception):
@@ -128,10 +134,10 @@ def probe_truth(mem, session, off, club_uid, pset):
 
 
 def probe_intersection(mem, session, off, pset):
-    """环节 3：检测算法本体试算。"""
+    """环节 3：检测算法本体试算（球员记录来源）。"""
     from fmlib.clubs import read_club_name, read_club_uid
 
-    print("\n[3] 全量交集试算（检测算法本体）")
+    print("\n[3] 全量交集试算（球员记录扫描来源）")
     teams = iter_teams(session, log=lambda s: print("   ", s))
     hits = []
     for t in teams:
@@ -144,6 +150,44 @@ def probe_intersection(mem, session, off, pset):
         uid = read_club_uid(mem, off, club) if club else None
         nm = read_club_name(mem, off, club) if club else None
         print(f"      TEAM=0x{t:X} coach=0x{m:X} club={uid} {nm or '?'}")
+    return set(teams)
+
+
+def probe_team_table(mem, session, off, pset, scanned_teams):
+    """环节 5：全局球队表遍历 + 与球员扫描交叉验证 + 仅用表的检测试算。"""
+    from fmlib.clubs import read_club_name, read_club_uid
+
+    print("\n[5] 全局球队表 [exe+team_root] -> 容器 -> 表")
+    try:
+        records, info = walk_team_table(session, log=lambda s: print("   ", s))
+    except Exception as exc:
+        print(f"    !! 全局球队表失败: {exc}")
+        return
+    if info.notes:
+        for n in info.notes:
+            print(f"    note: {n}")
+
+    # 样例行：uid / 类型 / 父俱乐部 uid / 名字
+    print("    前 8 行样例:")
+    for t in records[:8]:
+        uid_t = mem.read_u32(t + off.team_uid_off)
+        ttype = mem.read_u8(t + off.team_type_off)
+        club = mem.read_ptr(t + off.team_club_ptr_off)
+        cuid = read_club_uid(mem, off, club) if club else None
+        nm = read_club_name(mem, off, club) if club else None
+        print(f"      0x{t:X} uid={uid_t} type={ttype} club={cuid} {nm or '?'}")
+
+    # 与球员记录扫描的球队集合求交（同一对象则地址应重合）
+    if scanned_teams:
+        overlap = len(set(records) & set(scanned_teams))
+        only_scan = len(set(scanned_teams) - set(records))
+        print(
+            f"    与球员记录扫描球队地址交集: {overlap}"
+            f"（仅扫描有: {only_scan}，表: {len(records)}，扫描: {len(scanned_teams)}）"
+        )
+
+    matches = _match_clubs(session, pset, records)
+    print(f"    仅用球队表的检测结果: {[m.uid for m in matches]}")
 
 
 def probe_savegame_singleton(mem, base, off, club_uid):
@@ -182,7 +226,8 @@ def main():
 
         pset = probe_chain(mem, session, base, off)
         probe_truth(mem, session, off, club_uid, pset)
-        probe_intersection(mem, session, off, pset)
+        scanned_teams = probe_intersection(mem, session, off, pset)
+        probe_team_table(mem, session, off, pset, scanned_teams)
         probe_savegame_singleton(mem, base, off, club_uid)
 
 

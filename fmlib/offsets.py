@@ -59,6 +59,11 @@ class Offsets:
         self.club_uid_off = _int(club["uid"])
         self.club_name_off = _int(club["name_full"])
 
+        # 全局球队表（可选：缺该节时为 None，检测流程回退到球员记录扫描）
+        tt = raw.get("team_table_chain") or {}
+        self.team_table_root_rva = _int(tt["team_root_rva"]) if tt.get("team_root_rva") else None
+        self.table_container_off = _int(tt.get("container_off", 0x80))
+
         # regen 球员 uid 阈值：高于它的 uid 属于新生球员（用于合法性校验）
         self.regen_uid_threshold = _int(raw.get("regen_uid_threshold", 2002068000))
 
