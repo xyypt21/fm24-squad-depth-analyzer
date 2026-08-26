@@ -13,9 +13,11 @@
 import argparse
 import contextlib
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.pycache_prefix = str(Path(tempfile.gettempdir()) / "fm24-club-detector")
 
 from clubs import read_club_name, read_club_uid, type_id_ok  # noqa: E402
 from offsets import _int  # noqa: E402
