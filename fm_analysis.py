@@ -141,10 +141,8 @@ _REQUEST_TIMEOUT = 10
 # 翻译端点回退链：主端点（translate_a/single gtx）被 IP 限流时换备用端点
 # （clients5 translate_a/t dict-chrome-ex，限流池独立），两者都挂才退避重试。
 _TRANSLATE_URLS = (
-    "https://translate.googleapis.com/translate_a/single"
-    "?client=gtx&sl=en&tl=zh-CN&dt=t&q=",
-    "https://clients5.google.com/translate_a/t"
-    "?client=dict-chrome-ex&sl=en&tl=zh-CN&q=",
+    "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=",
+    "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=en&tl=zh-CN&q=",
 )
 # 端点全被限流时的重试次数与指数退避基数（1/2 秒），
 # 并尊重 Retry-After 头。
@@ -176,9 +174,7 @@ def _fetch_translate(url: str, proxies):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    opener = urllib.request.build_opener(
-        proxy_handler, urllib.request.HTTPSHandler(context=ctx)
-    )
+    opener = urllib.request.build_opener(proxy_handler, urllib.request.HTTPSHandler(context=ctx))
     req = urllib.request.Request(
         url, headers={"User-Agent": "Mozilla/5.0", "Accept-Encoding": "identity"}
     )
@@ -316,11 +312,7 @@ def _translate_xi_names(*groups, translate: bool = True) -> None:
     """
     if not translate:
         return
-    players = [
-        item if isinstance(item, dict) else item[1]
-        for group in groups
-        for item in group
-    ]
+    players = [item if isinstance(item, dict) else item[1] for group in groups for item in group]
     seen = set()
     names = []
     for p in players:
@@ -445,11 +437,12 @@ def render_pitch_22(ea_first, ea_second, sort_key, reference, ratio=0.9, extra_w
         else:
             parts.append(render_player_slot(slot_name, player, sort_key, reference, ratio))
         if sub_player is not None:
-            parts.append(render_player_slot(slot_name, sub_player, sort_key, reference, ratio, sub=True))
+            parts.append(
+                render_player_slot(slot_name, sub_player, sort_key, reference, ratio, sub=True)
+            )
         # 该位置任一来源标红（名单内球员 EA 弱 / 替补表红名）→ 整个位置加框
-        pos_weak = (
-            slot_name in (extra_weak or ())
-            or any(is_weak(p[sort_key], reference, ratio) for p in firsts + seconds)
+        pos_weak = slot_name in (extra_weak or ()) or any(
+            is_weak(p[sort_key], reference, ratio) for p in firsts + seconds
         )
         stack_cls = "slot-stack pos-weak" if pos_weak else "slot-stack"
         return f"<div class='{stack_cls}'>" + "".join(parts) + "</div>"
@@ -479,26 +472,18 @@ def render_pitch_22_card(ea_first, ea_second, sort_key, ratio=0.9, extra_weak=No
 
 
 def select_squad(candidates: List[dict], key: str):
-    """匈牙利一次选 22 人 + 按位置归位，返回 (首发, 替补)。
+    """分两轮匈牙利选 22 人：先选首发 11 人，再从剩余选替补 11 人。
 
-    同一位置多槽成本等价，求解器不区分首发/替补；按位置归位：
-    每个位置（SLOTS 里出现 k 次）取其实际分配到槽位的球员，key 前 k 名进首发、
-    其余进替补；某位置没有合适球员时该位置槽位留空（不出现在返回里）。
+    比"一次选 22 人再按 EA 切分"更准确：首发槽位优先拿到各位置最强球员，
+    不会被全局最优解挤到替补。
     """
-    picks = select_best_xi(candidates, key, SLOTS_22)
-    by_pos: Dict[str, List[tuple]] = {}
-    for slot_name, p in picks:
-        by_pos.setdefault(slot_name, []).append((slot_name, p))
-    ea_first = []
-    ea_second = []
-    # 按去重位置遍历：每个位置（在 SLOTS 出现 k 次）最多 2k 个槽位。
-    # 不能直接 for slot in SLOTS——DC/DMC 重复出现会整组重复入队。
-    for slot in dict.fromkeys(SLOTS):
-        k = SLOTS.count(slot)
-        group = sorted(by_pos.get(slot, []), key=lambda t: t[1][key], reverse=True)
-        ea_first.extend(group[:k])
-        ea_second.extend(group[k : k * 2])
-    return ea_first, ea_second
+    # 第 1 轮：首发 11 人
+    first_picks = select_best_xi(candidates, key, SLOTS)
+    first_ids = {id(p) for _, p in first_picks}
+    # 第 2 轮：从剩余球员里选替补 11 人
+    remaining = [p for p in candidates if id(p) not in first_ids]
+    second_picks = select_best_xi(remaining, key, SLOTS)
+    return first_picks, second_picks
 
 
 def render_remaining_list(players: List[dict]) -> str:
@@ -559,19 +544,22 @@ def render_depth_table(
             continue
         gap = max(0, position_pool_size(slot) - len(players))
         status_cls = "d-ok" if not gap else "d-short"
-        names = "、".join(
-            (
-                f"<span class='weak-name'>{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})</span>"
-                if is_weak(p["ea"], reference, ratio)
-                else f"{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})"
+        names = (
+            "、".join(
+                (
+                    f"<span class='weak-name'>{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})</span>"
+                    if is_weak(p["ea"], reference, ratio)
+                    else f"{p['name']}(CA{p['ca']}/EA{int(round(p['ea']))})"
+                )
+                for p in bench
             )
-            for p in bench
-        ) or "无"
+            or "无"
+        )
         rows.append(
             f"<div class='d-row {status_cls}'>"
             f"<div class='d-head'><span class='d-slot'>{slot}</span>"
             f"<span class='d-count'>替补{len(bench)}/{len(players)}</span>"
-            f"{('<span class=\'d-gap\'>缺 ' + str(gap) + ' 人</span>') if gap else ''}</div>"
+            f"{("<span class='d-gap'>缺 " + str(gap) + ' 人</span>') if gap else ''}</div>"
             f"<div class='d-players'>{names}</div>"
             f"</div>"
         )
@@ -687,10 +675,7 @@ def analyze(
     bench_weak = {
         slot
         for slot, players in pool.items()
-        if any(
-            id(p) not in chosen_ids and is_weak(p["ea"], reference, ratio)
-            for p in players
-        )
+        if any(id(p) not in chosen_ids and is_weak(p["ea"], reference, ratio) for p in players)
     }
 
     # 可卖榜：既不在 22 人主力、也不在替补表（任何位置池）的人，按年龄降序前 11
